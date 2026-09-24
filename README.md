@@ -101,11 +101,15 @@ Backend:
 - Railway ou Render.
 - Configure PostgreSQL gerenciado.
 - Defina `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET` e `CORS_ALLOWED_ORIGINS`.
+- Para Neon, use a URL JDBC no backend, por exemplo `jdbc:postgresql://HOST/neondb?sslmode=require`, junto com `DATABASE_USERNAME` e `DATABASE_PASSWORD`.
+- Configure `CORS_ALLOWED_ORIGINS` com a URL da Vercel, por exemplo `https://seu-projeto.vercel.app`.
 
 Frontend:
 
 - Vercel.
 - Defina `VITE_API_URL` apontando para a URL pública do backend com `/api`.
+- Se o projeto Vercel estiver apontando para a raiz do repositório, o `vercel.json` já manda instalar e buildar dentro de `frontend/`.
+- Neon hospeda apenas o PostgreSQL. O frontend da Vercel ainda precisa de uma API Java publicada em Railway, Render ou serviço equivalente.
 
 Banco:
 
