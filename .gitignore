@@ -1,0 +1,21 @@
+.idea/
+
+# Backend
+backend/target/
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+
+# Local env
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Archives
+*.zip

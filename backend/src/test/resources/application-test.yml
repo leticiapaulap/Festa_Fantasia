@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:festa;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+app:
+  jwt:
+    secret: test-secret-change-this-value-with-at-least-32-chars
+    expiration-minutes: 60
+  cors:
+    allowed-origins: http://localhost:5173
