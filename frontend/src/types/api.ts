@@ -4,6 +4,7 @@ export type Participant = {
   costumeName: string;
   description?: string;
   photoUrl?: string;
+  active: boolean;
   createdAt: string;
 };
 
@@ -14,11 +15,18 @@ export type EventSettings = {
   description?: string;
   eventDate?: string;
   eventTime?: string;
+  votingEndTime?: string;
+  timezone: string;
   votingOpen: boolean;
   registrationOpen: boolean;
   resultsPublic: boolean;
+  votingStatus: string;
+  showPublicResults: boolean;
   votingStart?: string;
   votingEnd?: string;
+  canAcceptVotes: boolean;
+  publicVotingUrl: string;
+  votingAvailability: string;
 };
 
 export type RankingItem = {

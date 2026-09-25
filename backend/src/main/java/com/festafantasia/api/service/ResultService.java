@@ -24,6 +24,20 @@ public class ResultService {
 
     @Transactional(readOnly = true)
     public ResultsResponse results() {
+        return results(false);
+    }
+
+    @Transactional(readOnly = true)
+    public ResultsResponse publicResults() {
+        return results(true);
+    }
+
+    private ResultsResponse results(boolean publicView) {
+        var settings = settingsService.currentEntity();
+        var canShowPublic = !publicView || (settings.isShowPublicResults() && "CLOSED".equals(settings.getVotingStatus()));
+        if (!canShowPublic) {
+            return new ResultsResponse(settings.isVotingOpen(), settings.isShowPublicResults(), false, 0, java.util.List.of(), java.util.List.of());
+        }
         var counts = new HashMap<Long, Long>();
         voteRepository.countVotesByParticipant()
                 .forEach(row -> counts.put((Long) row[0], (Long) row[1]));
@@ -38,7 +52,6 @@ public class ResultService {
                 .toList();
         var max = ranking.stream().mapToLong(RankingItem::votes).max().orElse(0);
         var winners = max == 0 ? java.util.List.<RankingItem>of() : ranking.stream().filter(item -> item.votes() == max).toList();
-        var settings = settingsService.currentEntity();
-        return new ResultsResponse(settings.isVotingOpen(), settings.isResultsPublic(), winners.size() > 1, totalVotes, ranking, winners);
+        return new ResultsResponse(settings.isVotingOpen(), settings.isShowPublicResults(), winners.size() > 1, totalVotes, ranking, winners);
     }
 }

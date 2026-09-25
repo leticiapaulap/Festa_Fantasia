@@ -9,7 +9,8 @@ public class ParticipantDtos {
             @NotBlank(message = "Informe o nome do participante.") @Size(max = 120) String name,
             @NotBlank(message = "Informe o nome da fantasia.") @Size(max = 120) String costumeName,
             @Size(max = 1000) String description,
-            @Size(max = 1000) String photoUrl
+            @Size(max = 1000) String photoUrl,
+            Boolean active
     ) {}
 
     public record ParticipantResponse(
@@ -18,6 +19,7 @@ public class ParticipantDtos {
             String costumeName,
             String description,
             String photoUrl,
+            boolean active,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {}

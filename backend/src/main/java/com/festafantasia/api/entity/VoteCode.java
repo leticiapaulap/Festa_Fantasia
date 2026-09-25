@@ -31,6 +31,10 @@ public class VoteCode {
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
     public boolean isUsed() { return used; }
+    public void resetUsage() {
+        this.used = false;
+        this.usedAt = null;
+    }
     public void markUsed() {
         this.used = true;
         this.usedAt = OffsetDateTime.now();

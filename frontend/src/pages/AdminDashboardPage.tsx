@@ -1,13 +1,14 @@
-import { Copy, Edit3, QrCode, Trash2 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { Copy, Download, Edit3, ExternalLink, Monitor, Trash2 } from 'lucide-react';
+import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { api, apiMessage } from '../services/api';
+import { publicVotingUrl } from '../services/publicUrl';
 import type { Dashboard, EventSettings, Participant, Results, VoteCode } from '../types/api';
 
-type Tab = 'ranking' | 'participants' | 'codes' | 'settings';
+type Tab = 'ranking' | 'participants' | 'codes' | 'qr' | 'settings';
 
 export function AdminDashboardPage() {
   const [tab, setTab] = useState<Tab>('ranking');
@@ -92,6 +93,15 @@ export function AdminDashboardPage() {
     }
   }
 
+  function downloadQr() {
+    const canvas = document.getElementById('admin-voting-qr-download') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = 'qr-votacao-festa-fantasia.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
   return (
     <section className="grid gap-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -106,7 +116,7 @@ export function AdminDashboardPage() {
         <button className="btn-secondary" onClick={() => toggleVoting(false)}>Encerrar votação</button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {(['ranking', 'participants', 'codes', 'settings'] as Tab[]).map((item) => (
+        {(['ranking', 'participants', 'codes', 'qr', 'settings'] as Tab[]).map((item) => (
           <button key={item} className={tab === item ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'} onClick={() => setTab(item)}>
             {labelFor(item)}
           </button>
@@ -115,7 +125,9 @@ export function AdminDashboardPage() {
       {tab === 'ranking' && <Ranking results={results} />}
       {tab === 'participants' && <ParticipantsAdmin participants={participants} onEdit={setEditing} onDelete={removeParticipant} />}
       {tab === 'codes' && <CodesAdmin codes={codes} onGenerate={generateCodes} />}
+      {tab === 'qr' && settings && <QrAdmin settings={settings} participants={participants} totalVotes={dashboard?.votes ?? 0} onDownload={downloadQr} />}
       {tab === 'settings' && settings && <SettingsAdmin settings={settings} onSave={saveSettings} />}
+      <QRCodeCanvas id="admin-voting-qr-download" className="hidden" value={publicVotingUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       <EditParticipantModal participant={editing} onClose={() => setEditing(null)} onSave={saveParticipant} />
     </section>
   );
@@ -126,7 +138,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 }
 
 function labelFor(tab: Tab) {
-  return ({ ranking: 'Ranking', participants: 'Participantes', codes: 'Códigos', settings: 'Configurações' })[tab];
+  return ({ ranking: 'Ranking', participants: 'Participantes', codes: 'Códigos', qr: 'QR Code', settings: 'Configurações' })[tab];
 }
 
 function Ranking({ results }: { results: Results | null }) {
@@ -178,6 +190,58 @@ function CodesAdmin({ codes, onGenerate }: { codes: VoteCode[]; onGenerate: (qua
   );
 }
 
+function QrAdmin({ settings, participants, totalVotes, onDownload }: { settings: EventSettings; participants: Participant[]; totalVotes: number; onDownload: () => void }) {
+  const voteUrl = publicVotingUrl();
+  const active = participants.filter((participant) => participant.active);
+  const activeWithPhoto = active.filter((participant) => !!participant.photoUrl);
+  const missingPhotos = active.length - activeWithPhoto.length;
+  const configured = !!settings.eventDate && !!settings.eventTime && !!settings.timezone;
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+      <div className="card grid gap-4">
+        <div>
+          <p className="text-sm font-bold uppercase text-ember">Configurações da votação</p>
+          <h2 className="mt-1 text-2xl font-black text-white">QR Code</h2>
+          <p className="mt-2 text-white/65">Pré-visualização administrativa. O QR ainda não está público antes da janela e do status OPEN.</p>
+        </div>
+        <div className="grid place-items-center rounded-lg border border-white/10 bg-white p-5">
+          <QRCodeSVG value={voteUrl} size={300} bgColor="#ffffff" fgColor="#111111" />
+        </div>
+        <p className="break-all rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">{voteUrl}</p>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" type="button" onClick={onDownload}><Download className="h-4 w-4" /> Baixar QR</button>
+          <a className="btn-secondary" href="/admin/qr" target="_blank" rel="noreferrer"><Monitor className="h-4 w-4" /> Abrir tela cheia</a>
+          <a className="btn-secondary" href="/votar" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Testar votação</a>
+        </div>
+      </div>
+      <div className="card grid content-start gap-3">
+        <h3 className="text-xl font-bold text-white">Pronto para a votação</h3>
+        <Readiness label="Participantes cadastrados" value={participants.length} ok={participants.length > 0} />
+        <Readiness label="Participantes ativos" value={active.length} ok={active.length > 0} />
+        <Readiness label="Ativos com foto" value={activeWithPhoto.length} ok={missingPhotos === 0 && active.length > 0} />
+        <Readiness label="Configuração de data definida" value={configured ? 'Sim' : 'Não'} ok={configured} />
+        <Readiness label="QR Code configurado" value="Sim" ok />
+        {missingPhotos > 0 && <p className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-semibold text-amber-100">{missingPhotos} participante(s) ativo(s) sem foto.</p>}
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">
+          <p className="font-bold text-white">Festa Fantasia</p>
+          <p>Status: {settings.canAcceptVotes ? 'Votação aberta' : settings.votingAvailability}</p>
+          <p>Total de votos: {totalVotes}</p>
+          <p>Participantes: {participants.length}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Readiness({ label, value, ok }: { label: string; value: string | number; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+      <span className="text-sm text-white/70">{label}</span>
+      <span className={ok ? 'font-bold text-emerald-200' : 'font-bold text-amber-100'}>{value}</span>
+    </div>
+  );
+}
+
 function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: (settings: EventSettings) => void }) {
   const [draft, setDraft] = useState(settings);
   useEffect(() => setDraft(settings), [settings]);
@@ -189,10 +253,11 @@ function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: 
       <div className="grid gap-3 sm:grid-cols-2">
         <input className="input" type="date" value={draft.eventDate ?? ''} onChange={(e) => setDraft({ ...draft, eventDate: e.target.value })} />
         <input className="input" type="time" value={draft.eventTime ?? ''} onChange={(e) => setDraft({ ...draft, eventTime: e.target.value })} />
+        <input className="input" type="time" value={draft.votingEndTime ?? ''} onChange={(e) => setDraft({ ...draft, votingEndTime: e.target.value })} aria-label="Encerramento da votação" />
+        <input className="input" value={draft.timezone ?? 'America/Sao_Paulo'} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })} placeholder="America/Sao_Paulo" aria-label="Timezone" />
       </div>
       <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.registrationOpen} onChange={(e) => setDraft({ ...draft, registrationOpen: e.target.checked })} /> Cadastro aberto</label>
-      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.votingOpen} onChange={(e) => setDraft({ ...draft, votingOpen: e.target.checked })} /> Votação aberta</label>
-      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.resultsPublic} onChange={(e) => setDraft({ ...draft, resultsPublic: e.target.checked })} /> Resultado público</label>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.resultsPublic} onChange={(e) => setDraft({ ...draft, resultsPublic: e.target.checked, showPublicResults: e.target.checked })} /> Resultado público</label>
       <button className="btn-primary w-full">Salvar configurações</button>
     </form>
   );

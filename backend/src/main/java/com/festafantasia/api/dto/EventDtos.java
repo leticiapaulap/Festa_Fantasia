@@ -12,11 +12,18 @@ public class EventDtos {
             String description,
             LocalDate eventDate,
             LocalTime eventTime,
+            LocalTime votingEndTime,
+            String timezone,
             boolean votingOpen,
             boolean registrationOpen,
             boolean resultsPublic,
+            String votingStatus,
+            boolean showPublicResults,
             OffsetDateTime votingStart,
-            OffsetDateTime votingEnd
+            OffsetDateTime votingEnd,
+            boolean canAcceptVotes,
+            String publicVotingUrl,
+            String votingAvailability
     ) {}
 
     public record EventSettingsRequest(
@@ -25,9 +32,13 @@ public class EventDtos {
             String description,
             LocalDate eventDate,
             LocalTime eventTime,
+            LocalTime votingEndTime,
+            String timezone,
             Boolean votingOpen,
             Boolean registrationOpen,
             Boolean resultsPublic,
+            String votingStatus,
+            Boolean showPublicResults,
             OffsetDateTime votingStart,
             OffsetDateTime votingEnd
     ) {}

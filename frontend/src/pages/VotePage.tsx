@@ -2,15 +2,17 @@ import { CheckCircle2, KeyRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { BackHomeLink } from '../components/BackHomeLink';
 import { Modal } from '../components/Modal';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { SkeletonGrid } from '../components/SkeletonGrid';
 import { api, apiMessage } from '../services/api';
-import type { Participant } from '../types/api';
+import type { EventSettings, Participant } from '../types/api';
 
 export function VotePage() {
   const [params] = useSearchParams();
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [settings, setSettings] = useState<EventSettings | null>(null);
   const [code, setCode] = useState(params.get('codigo') ?? '');
   const [selected, setSelected] = useState<Participant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,8 +20,11 @@ export function VotePage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    api.get<Participant[]>('/participants')
-      .then(({ data }) => setParticipants(data))
+    Promise.all([api.get<Participant[]>('/participants'), api.get<EventSettings>('/settings')])
+      .then(([people, eventSettings]) => {
+        setParticipants(people.data);
+        setSettings(eventSettings.data);
+      })
       .catch((error) => toast.error(apiMessage(error)))
       .finally(() => setLoading(false));
   }, []);
@@ -45,14 +50,27 @@ export function VotePage() {
     return (
       <section className="mx-auto grid max-w-xl place-items-center gap-5 py-16 text-center">
         <CheckCircle2 className="h-16 w-16 text-emerald-300" />
-        <h1 className="text-3xl font-black text-white">Voto registrado!</h1>
+        <h1 className="text-3xl font-black text-white">Voto registrado com sucesso!</h1>
         <p className="text-lg text-white/70">Obrigado por participar.</p>
+        <BackHomeLink />
+      </section>
+    );
+  }
+
+  if (!loading && settings?.canAcceptVotes !== true) {
+    const closed = settings?.votingAvailability === 'CLOSED' || settings?.votingAvailability === 'AFTER_WINDOW';
+    return (
+      <section className="mx-auto grid max-w-xl place-items-center gap-5 py-16 text-center">
+        <h1 className="text-3xl font-black text-white">{closed ? 'Votação encerrada' : 'Votação ainda não disponível'}</h1>
+        <p className="text-lg text-white/70">{closed ? 'Obrigado pela participação.' : 'A votação será liberada durante o evento.'}</p>
+        <BackHomeLink />
       </section>
     );
   }
 
   return (
     <section className="grid gap-5 py-6">
+      <BackHomeLink />
       <div className="grid gap-4 md:grid-cols-[1fr_22rem] md:items-end">
         <div>
           <p className="text-sm font-bold uppercase text-ember">Votação</p>
@@ -81,9 +99,9 @@ export function VotePage() {
       <Modal open={!!selected} title="Confirmar voto?" onClose={() => setSelected(null)}>
         <div className="grid gap-4">
           <p className="text-white/75">Você está votando em:</p>
-          <p className="text-xl font-black text-white">{selected?.costumeName} — {selected?.name}</p>
+          <ParticipantCard participant={selected ?? undefined} compact />
           <div className="grid grid-cols-2 gap-3">
-            <button className="btn-secondary" onClick={() => setSelected(null)}>Cancelar</button>
+            <button className="btn-secondary" onClick={() => setSelected(null)}>Voltar</button>
             <button className="btn-primary" disabled={submitting} onClick={confirmVote}>{submitting ? 'Confirmando...' : 'Confirmar voto'}</button>
           </div>
         </div>

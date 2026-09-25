@@ -27,6 +27,12 @@ public class EventSettings {
     @Column(name = "event_time")
     private LocalTime eventTime;
 
+    @Column(name = "voting_end_time")
+    private LocalTime votingEndTime;
+
+    @Column(nullable = false, length = 80)
+    private String timezone = "America/Sao_Paulo";
+
     @Column(name = "voting_open", nullable = false)
     private boolean votingOpen;
 
@@ -35,6 +41,12 @@ public class EventSettings {
 
     @Column(name = "results_public", nullable = false)
     private boolean resultsPublic;
+
+    @Column(name = "voting_status", nullable = false, length = 20)
+    private String votingStatus = "DRAFT";
+
+    @Column(name = "show_public_results", nullable = false)
+    private boolean showPublicResults;
 
     @Column(name = "voting_start")
     private OffsetDateTime votingStart;
@@ -62,12 +74,26 @@ public class EventSettings {
     public void setEventDate(LocalDate eventDate) { this.eventDate = eventDate; }
     public LocalTime getEventTime() { return eventTime; }
     public void setEventTime(LocalTime eventTime) { this.eventTime = eventTime; }
+    public LocalTime getVotingEndTime() { return votingEndTime; }
+    public void setVotingEndTime(LocalTime votingEndTime) { this.votingEndTime = votingEndTime; }
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
     public boolean isVotingOpen() { return votingOpen; }
     public void setVotingOpen(boolean votingOpen) { this.votingOpen = votingOpen; }
     public boolean isRegistrationOpen() { return registrationOpen; }
     public void setRegistrationOpen(boolean registrationOpen) { this.registrationOpen = registrationOpen; }
     public boolean isResultsPublic() { return resultsPublic; }
-    public void setResultsPublic(boolean resultsPublic) { this.resultsPublic = resultsPublic; }
+    public void setResultsPublic(boolean resultsPublic) {
+        this.resultsPublic = resultsPublic;
+        this.showPublicResults = resultsPublic;
+    }
+    public String getVotingStatus() { return votingStatus; }
+    public void setVotingStatus(String votingStatus) { this.votingStatus = votingStatus; }
+    public boolean isShowPublicResults() { return showPublicResults; }
+    public void setShowPublicResults(boolean showPublicResults) {
+        this.showPublicResults = showPublicResults;
+        this.resultsPublic = showPublicResults;
+    }
     public OffsetDateTime getVotingStart() { return votingStart; }
     public void setVotingStart(OffsetDateTime votingStart) { this.votingStart = votingStart; }
     public OffsetDateTime getVotingEnd() { return votingEnd; }

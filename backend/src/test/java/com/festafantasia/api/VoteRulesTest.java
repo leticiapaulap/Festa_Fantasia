@@ -1,6 +1,7 @@
 package com.festafantasia.api;
 
 import com.festafantasia.api.dto.ParticipantDtos.ParticipantRequest;
+import com.festafantasia.api.dto.EventDtos.EventSettingsRequest;
 import com.festafantasia.api.dto.VoteDtos.VoteRequest;
 import com.festafantasia.api.exception.BusinessException;
 import com.festafantasia.api.repository.VoteRepository;
@@ -17,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,7 +44,22 @@ class VoteRulesTest {
         voteRepository.deleteAll();
         voteCodeRepository.deleteAll();
         participantRepository.deleteAll();
-        settingsService.setVoting(false);
+        settingsService.update(new EventSettingsRequest(
+                null,
+                null,
+                null,
+                LocalDate.now(),
+                LocalTime.MIN,
+                LocalTime.of(23, 59),
+                "America/Sao_Paulo",
+                false,
+                true,
+                false,
+                "DRAFT",
+                false,
+                null,
+                null
+        ));
     }
 
     @Test
@@ -121,6 +139,6 @@ class VoteRulesTest {
     }
 
     private com.festafantasia.api.dto.ParticipantDtos.ParticipantResponse participant(String name, String costume) {
-        return participantService.create(new ParticipantRequest(name, costume, null, null));
+        return participantService.create(new ParticipantRequest(name, costume, null, null, true));
     }
 }

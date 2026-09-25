@@ -26,7 +26,7 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public DashboardResponse dashboard() {
         var settings = settingsService.current();
-        var status = settings.votingOpen() ? "VOTAÇÃO ABERTA" : "VOTAÇÃO ENCERRADA";
+        var status = settings.canAcceptVotes() ? "VOTAÇÃO ABERTA" : settings.votingAvailability();
         return new DashboardResponse(
                 participantRepository.count(),
                 voteRepository.count(),

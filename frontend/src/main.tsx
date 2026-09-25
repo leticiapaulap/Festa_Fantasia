@@ -12,6 +12,7 @@ import { VotePage } from './pages/VotePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { AdminQrPage } from './pages/AdminQrPage';
 import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -28,6 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           </Route>
           <Route path="/admin" element={<AdminLoginPage />} />
           <Route path="/admin/painel" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
+          <Route path="/admin/qr" element={<AdminQrPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster position="top-center" toastOptions={{ className: 'toast' }} />

@@ -11,7 +11,9 @@ import com.festafantasia.api.dto.VoteDtos.VoteResponse;
 import com.festafantasia.api.service.*;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -43,9 +45,20 @@ public class PublicController {
         return participantService.create(request);
     }
 
+    @PostMapping(value = "/participants", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ParticipantResponse createParticipantWithPhoto(
+            @RequestParam String name,
+            @RequestParam String costumeName,
+            @RequestParam(required = false) String description,
+            @RequestPart(required = false) MultipartFile photo
+    ) {
+        return participantService.create(name, costumeName, description, photo);
+    }
+
     @GetMapping("/participants")
     public List<ParticipantResponse> participants() {
-        return participantService.list();
+        return participantService.listActive();
     }
 
     @GetMapping("/participants/{id}")
@@ -65,6 +78,6 @@ public class PublicController {
 
     @GetMapping("/results")
     public ResultsResponse results() {
-        return resultService.results();
+        return resultService.publicResults();
     }
 }

@@ -16,7 +16,7 @@ export function ParticipantCard({ participant, ranking, action, compact }: Props
 
   return (
     <article className="card group grid gap-4 transition duration-300 hover:-translate-y-1 hover:border-ember/40">
-      <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-gradient-to-br from-velvet/45 via-black/30 to-ember/25">
+      <div className="aspect-square w-full overflow-hidden rounded-lg bg-gradient-to-br from-velvet/45 via-black/30 to-ember/25">
         {photoUrl ? (
           <img src={photoUrl} alt={costumeName} className="h-full w-full object-cover" />
         ) : (

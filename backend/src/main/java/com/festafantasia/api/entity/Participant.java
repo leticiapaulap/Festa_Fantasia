@@ -22,6 +22,9 @@ public class Participant {
     @Column(name = "photo_url", length = 1000)
     private String photoUrl;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -49,6 +52,8 @@ public class Participant {
     public void setDescription(String description) { this.description = description; }
     public String getPhotoUrl() { return photoUrl; }
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
 }

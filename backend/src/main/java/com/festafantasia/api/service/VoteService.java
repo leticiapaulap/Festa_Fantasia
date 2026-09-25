@@ -28,10 +28,14 @@ public class VoteService {
 
     @Transactional
     public VoteResponse vote(VoteRequest request) {
-        if (!settingsService.currentEntity().isVotingOpen()) {
-            throw new BusinessException("A votação já foi encerrada.", HttpStatus.CONFLICT);
+        var settings = settingsService.currentEntity();
+        if (!settingsService.canAcceptVotes(settings)) {
+            throw new BusinessException(messageFor(settingsService.availability(settings)), HttpStatus.CONFLICT);
         }
         var participant = participantService.find(request.participantId());
+        if (!participant.isActive()) {
+            throw new BusinessException("Esta fantasia não está disponível para votação.", HttpStatus.CONFLICT);
+        }
         var code = voteCodeRepository.findByCodeForUpdate(voteCodeService.normalize(request.code()))
                 .orElseThrow(() -> new BusinessException("Código de votação inválido.", HttpStatus.NOT_FOUND));
         if (code.isUsed()) {
@@ -43,5 +47,13 @@ public class VoteService {
         code.markUsed();
         voteRepository.save(vote);
         return new VoteResponse("Voto registrado! Obrigado por participar.");
+    }
+
+    private String messageFor(String availability) {
+        return switch (availability) {
+            case "BEFORE_WINDOW", "DRAFT", "NOT_CONFIGURED" -> "A votação ainda não está disponível.";
+            case "AFTER_WINDOW", "CLOSED" -> "A votação foi encerrada.";
+            default -> "A votação não está disponível.";
+        };
     }
 }
