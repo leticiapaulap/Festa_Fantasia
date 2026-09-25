@@ -132,8 +132,8 @@ export function AdminDashboardPage() {
           settings={settings}
           participants={participants}
           totalVotes={dashboard?.votes ?? 0}
-          onDownload={() => downloadQr('admin-voting-qr-download', 'qr-votacao-festa-fantasia.png')}
-          onDownloadRegistration={() => downloadQr('admin-registration-qr-download', 'qr-cadastro-festa-fantasia.png')}
+          onDownload={() => downloadQr('admin-voting-qr-download', 'qr-votacao-halloween.png')}
+          onDownloadRegistration={() => downloadQr('admin-registration-qr-download', 'qr-cadastro-halloween.png')}
         />
       )}
       {tab === 'results' && <Ranking results={results} />}
@@ -258,7 +258,7 @@ function QrAdmin({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="card grid gap-4">
         <div>
-          <p className="text-sm font-bold uppercase text-ember">QR Code de cadastro</p>
+          <p className="text-sm font-bold uppercase text-ember">QR Code de Cadastro — Halloween</p>
           <h2 className="mt-1 text-2xl font-black text-white">Cadastro</h2>
           <p className="mt-2 text-white/65">Disponível para preparação, impressão e compartilhamento administrativo.</p>
           <p className="mt-2 text-sm font-bold text-white/70">Status: {settings.registrationOpen ? 'Cadastros abertos' : 'Cadastros encerrados'}</p>
@@ -275,8 +275,8 @@ function QrAdmin({
       </div>
       <div className="card grid gap-4">
         <div>
-          <p className="text-sm font-bold uppercase text-ember">Configurações da votação</p>
-          <h2 className="mt-1 text-2xl font-black text-white">QR Code</h2>
+          <p className="text-sm font-bold uppercase text-ember">QR Code de Votação — Halloween</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Votação</h2>
           <p className="mt-2 text-white/65">Pré-visualização administrativa. O QR ainda não está público antes da janela e do status OPEN.</p>
         </div>
         <div className="grid place-items-center rounded-lg border border-white/10 bg-white p-5">
@@ -299,7 +299,7 @@ function QrAdmin({
         <Readiness label="QR Code configurado" value="Sim" ok />
         {missingPhotos > 0 && <p className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-semibold text-amber-100">{missingPhotos} participante(s) ativo(s) sem foto.</p>}
         <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">
-          <p className="font-bold text-white">Festa Fantasia</p>
+          <p className="font-bold text-white">Halloween</p>
           <p>Status: {settings.canAcceptVotes ? 'Votação aberta' : settings.votingAvailability}</p>
           <p>Total de votos: {totalVotes}</p>
           <p>Participantes: {participants.length}</p>

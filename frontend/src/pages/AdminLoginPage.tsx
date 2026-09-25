@@ -57,7 +57,7 @@ export function AdminLoginPage() {
         </Link>
         <div className="mb-6 grid gap-2 text-center">
           <LockKeyhole className="mx-auto h-10 w-10 text-ember" />
-          <h1 className="text-2xl font-black text-white">Painel Administrativo</h1>
+          <h1 className="text-2xl font-black text-white">Halloween — Painel Administrativo</h1>
           <p className="text-sm text-white/60">Entre para controlar votação, códigos e resultado.</p>
         </div>
         {creating && (

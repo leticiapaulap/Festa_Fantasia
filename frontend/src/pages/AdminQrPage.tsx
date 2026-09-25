@@ -24,7 +24,7 @@ export function AdminQrPage() {
       </Link>
       <div className="grid w-full max-w-5xl place-items-center gap-8">
         <div>
-          <p className="text-xl font-bold uppercase text-ember">Festa Fantasia</p>
+          <p className="text-xl font-bold uppercase text-ember">Halloween</p>
           <h1 className="mt-3 text-5xl font-black uppercase leading-tight text-white sm:text-7xl">Escaneie e vote</h1>
           <p className="mt-4 text-2xl text-white/70">{settings?.canAcceptVotes ? 'Votação aberta' : 'Pré-visualização administrativa'}</p>
         </div>

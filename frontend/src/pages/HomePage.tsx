@@ -30,13 +30,13 @@ export function HomePage() {
         <p className="mb-3 inline-flex rounded-full border border-ember/35 bg-ember/10 px-3 py-1 text-sm font-bold uppercase text-ember">
           Concurso da noite
         </p>
-        <h1 className="max-w-3xl text-4xl font-black uppercase leading-tight text-white sm:text-5xl lg:text-6xl">Festa Fantasia</h1>
+        <h1 className="max-w-3xl text-4xl font-black uppercase leading-tight text-white sm:text-5xl lg:text-6xl">Halloween</h1>
         {eventDate && <p className="mt-3 text-sm font-semibold uppercase text-white/55">{eventDate}</p>}
 
         {phase === 'REGISTRATION' && (
           <>
             <p className="mt-4 inline-flex rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-sm font-bold uppercase text-emerald-100">Cadastros abertos</p>
-            <p className="mt-4 max-w-2xl text-xl leading-8 text-white/75">Cadastre sua fantasia para participar do concurso.</p>
+            <p className="mt-4 max-w-2xl text-xl leading-8 text-white/75">Cadastre sua fantasia para participar do Halloween.</p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               <Link className="btn-primary" to="/cadastro">Cadastrar minha fantasia</Link>
               <Link className="btn-secondary" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
@@ -110,7 +110,7 @@ export function HomePage() {
           <StatusPanel title="Votação aguardando" text="Cadastros encerrados. A votação será liberada durante o evento." />
         )}
         {phase === 'FINISHED' && (
-          <StatusPanel title="Festa Fantasia" text="A votação foi encerrada. Obrigado por participar." />
+          <StatusPanel title="Halloween" text="A votação foi encerrada. Obrigado por participar." />
         )}
       </aside>
 

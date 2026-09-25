@@ -30,7 +30,7 @@ export function ResultPage() {
       <div className="text-center">
         <Trophy className="mx-auto h-14 w-14 text-ember" />
         <p className="mt-3 text-sm font-bold uppercase text-ember">{results.tie ? 'Temos um empate!' : 'Melhor fantasia da noite'}</p>
-        <h1 className="mt-2 text-3xl font-black text-white">Resultado Final</h1>
+        <h1 className="mt-2 text-3xl font-black text-white">Resultado Final — Halloween</h1>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {results.winners.map((winner) => <ParticipantCard key={winner.participantId} ranking={winner} />)}

@@ -13,7 +13,7 @@ export function AdminHeader() {
           <ArrowLeft className="h-4 w-4" /> Site
         </Link>
         <div>
-          <p className="text-sm uppercase text-ember">Festa Fantasia</p>
+          <p className="text-sm uppercase text-ember">Halloween</p>
           <h1 className="text-2xl font-black text-white">Área administrativa</h1>
         </div>
       </div>

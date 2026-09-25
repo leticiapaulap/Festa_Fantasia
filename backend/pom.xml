@@ -13,7 +13,7 @@
     <groupId>com.festafantasia</groupId>
     <artifactId>api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Festa Fantasia API</name>
+    <name>Halloween API</name>
     <description>Backend do concurso de melhor fantasia</description>
 
     <properties>

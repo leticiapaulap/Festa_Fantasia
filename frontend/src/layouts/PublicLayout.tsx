@@ -9,7 +9,7 @@ export function PublicLayout() {
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-ember text-night">
             <VenetianMask className="h-5 w-5" />
           </span>
-          <span className="truncate">Festa à Fantasia</span>
+          <span className="truncate">Halloween</span>
         </Link>
         <Link to="/admin" className="rounded-lg border border-white/10 p-3 text-white/75 hover:bg-white/10" aria-label="Admin">
           <Shield className="h-5 w-5" />

@@ -1,4 +1,4 @@
-# Festa à Fantasia — Concurso de Melhor Fantasia
+# Halloween — Concurso de Melhor Fantasia
 
 Sistema full stack para uma festa real: cadastro de fantasias, listagem pública, votação com códigos únicos, painel administrativo, QR Codes, encerramento da votação e resultado público com ranking e confetes.
 

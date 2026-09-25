@@ -142,7 +142,7 @@ public class AdminController {
                     .append('\n');
         }
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resultados-festa-fantasia.csv")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resultados-halloween.csv")
                 .body(builder.toString());
     }
 
