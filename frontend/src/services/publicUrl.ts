@@ -7,3 +7,7 @@ export function publicAppUrl() {
 export function publicVotingUrl() {
   return `${publicAppUrl()}/votar`;
 }
+
+export function publicRegistrationUrl() {
+  return `${publicAppUrl()}/cadastro`;
+}

@@ -1,6 +1,7 @@
 import confetti from 'canvas-confetti';
 import { Trophy } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { BackHomeLink } from '../components/BackHomeLink';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { api, apiMessage } from '../services/api';
 import type { Results } from '../types/api';
@@ -20,12 +21,12 @@ export function ResultPage() {
       .catch((err) => setError(apiMessage(err)));
   }, []);
 
-  if (error) return <div className="card mt-8 text-orange-100">{error}</div>;
-  if (!results) return <div className="card mt-8 text-white/70">Carregando resultado...</div>;
-  if (!results.resultsPublic) return <div className="card mt-8 text-center text-xl text-white">A votação ainda está acontecendo.</div>;
+  if (error) return <PageShell><div className="card text-orange-100">{error}</div></PageShell>;
+  if (!results) return <PageShell><div className="card text-white/70">Carregando resultado...</div></PageShell>;
+  if (!results.resultsPublic) return <PageShell><div className="card text-center text-xl text-white">A votação ainda está acontecendo.</div></PageShell>;
 
   return (
-    <section className="grid gap-6 py-6">
+    <PageShell>
       <div className="text-center">
         <Trophy className="mx-auto h-14 w-14 text-ember" />
         <p className="mt-3 text-sm font-bold uppercase text-ember">{results.tie ? 'Temos um empate!' : 'Melhor fantasia da noite'}</p>
@@ -50,6 +51,15 @@ export function ResultPage() {
           ))}
         </div>
       </div>
+    </PageShell>
+  );
+}
+
+function PageShell({ children }: { children: ReactNode }) {
+  return (
+    <section className="grid gap-6 py-6">
+      <BackHomeLink />
+      {children}
     </section>
   );
 }

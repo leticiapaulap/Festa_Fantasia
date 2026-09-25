@@ -5,13 +5,14 @@ import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { api, apiMessage } from '../services/api';
-import { publicVotingUrl } from '../services/publicUrl';
+import { formatEventDate, registrationStatusLabel, votingStatusLabel } from '../services/eventPhase';
+import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
 import type { Dashboard, EventSettings, Participant, Results, VoteCode } from '../types/api';
 
-type Tab = 'ranking' | 'participants' | 'codes' | 'qr' | 'settings';
+type Tab = 'summary' | 'participants' | 'qr' | 'results' | 'codes' | 'settings';
 
 export function AdminDashboardPage() {
-  const [tab, setTab] = useState<Tab>('ranking');
+  const [tab, setTab] = useState<Tab>('summary');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -41,6 +42,7 @@ export function AdminDashboardPage() {
   }, []);
 
   async function toggleVoting(open: boolean) {
+    if (open && settings?.registrationOpen && !window.confirm('Os cadastros ainda estão abertos.\n\nDeseja encerrá-los e iniciar a votação?')) return;
     if (!open && !window.confirm('Tem certeza que deseja encerrar a votação?')) return;
     try {
       await api.post(open ? '/admin/voting/open' : '/admin/voting/close');
@@ -93,11 +95,11 @@ export function AdminDashboardPage() {
     }
   }
 
-  function downloadQr() {
-    const canvas = document.getElementById('admin-voting-qr-download') as HTMLCanvasElement | null;
+  function downloadQr(id: string, filename: string) {
+    const canvas = document.getElementById(id) as HTMLCanvasElement | null;
     if (!canvas) return;
     const link = document.createElement('a');
-    link.download = 'qr-votacao-festa-fantasia.png';
+    link.download = filename;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }
@@ -116,17 +118,27 @@ export function AdminDashboardPage() {
         <button className="btn-secondary" onClick={() => toggleVoting(false)}>Encerrar votação</button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {(['ranking', 'participants', 'codes', 'qr', 'settings'] as Tab[]).map((item) => (
+        {(['summary', 'participants', 'qr', 'results', 'codes', 'settings'] as Tab[]).map((item) => (
           <button key={item} className={tab === item ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'} onClick={() => setTab(item)}>
             {labelFor(item)}
           </button>
         ))}
       </div>
-      {tab === 'ranking' && <Ranking results={results} />}
+      {tab === 'summary' && settings && <SummaryAdmin settings={settings} participants={participants} totalVotes={dashboard?.votes ?? 0} onGoParticipants={() => setTab('participants')} />}
       {tab === 'participants' && <ParticipantsAdmin participants={participants} onEdit={setEditing} onDelete={removeParticipant} />}
       {tab === 'codes' && <CodesAdmin codes={codes} onGenerate={generateCodes} />}
-      {tab === 'qr' && settings && <QrAdmin settings={settings} participants={participants} totalVotes={dashboard?.votes ?? 0} onDownload={downloadQr} />}
+      {tab === 'qr' && settings && (
+        <QrAdmin
+          settings={settings}
+          participants={participants}
+          totalVotes={dashboard?.votes ?? 0}
+          onDownload={() => downloadQr('admin-voting-qr-download', 'qr-votacao-festa-fantasia.png')}
+          onDownloadRegistration={() => downloadQr('admin-registration-qr-download', 'qr-cadastro-festa-fantasia.png')}
+        />
+      )}
+      {tab === 'results' && <Ranking results={results} />}
       {tab === 'settings' && settings && <SettingsAdmin settings={settings} onSave={saveSettings} />}
+      <QRCodeCanvas id="admin-registration-qr-download" className="hidden" value={publicRegistrationUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       <QRCodeCanvas id="admin-voting-qr-download" className="hidden" value={publicVotingUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       <EditParticipantModal participant={editing} onClose={() => setEditing(null)} onSave={saveParticipant} />
     </section>
@@ -138,7 +150,40 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 }
 
 function labelFor(tab: Tab) {
-  return ({ ranking: 'Ranking', participants: 'Participantes', codes: 'Códigos', qr: 'QR Code', settings: 'Configurações' })[tab];
+  return ({ summary: 'Resumo', participants: 'Participantes', qr: 'QR Codes', results: 'Resultados', codes: 'Códigos', settings: 'Configurações' })[tab];
+}
+
+function SummaryAdmin({ settings, participants, totalVotes, onGoParticipants }: { settings: EventSettings; participants: Participant[]; totalVotes: number; onGoParticipants: () => void }) {
+  const active = participants.filter((participant) => participant.active);
+  const withPhoto = active.filter((participant) => !!participant.photoUrl);
+  const missingPhotos = active.length - withPhoto.length;
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+      <div className="card grid gap-3">
+        <h2 className="text-xl font-bold text-white">Status do evento</h2>
+        <Readiness label="Cadastros" value={registrationStatusLabel(settings)} ok={settings.registrationOpen} />
+        <Readiness label="Votação" value={votingStatusLabel(settings)} ok={settings.canAcceptVotes} />
+        <Readiness label="Total de votos" value={totalVotes} ok={totalVotes > 0} />
+      </div>
+      <div className="card grid gap-3">
+        <h2 className="text-xl font-bold text-white">Preparação para a festa</h2>
+        <Readiness label="Participantes cadastrados" value={participants.length} ok={participants.length > 0} />
+        <Readiness label="Com foto" value={withPhoto.length} ok={withPhoto.length === active.length && active.length > 0} />
+        <Readiness label="Sem foto" value={missingPhotos} ok={missingPhotos === 0} />
+        <Readiness label="Cadastros" value={registrationStatusLabel(settings)} ok={settings.registrationOpen} />
+        <Readiness label="Data da festa" value={formatEventDate(settings) || 'Não definida'} ok={!!settings.eventDate} />
+        <Readiness label="QR Cadastro" value="Pronto" ok />
+        <Readiness label="QR Votação" value="Pronto" ok />
+        <Readiness label="Votação" value={votingStatusLabel(settings)} ok={settings.canAcceptVotes} />
+        {missingPhotos > 0 && (
+          <div className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3">
+            <p className="text-sm font-semibold text-amber-100">{missingPhotos} participante(s) ativo(s) sem foto.</p>
+            <button className="btn-secondary mt-3 min-h-10 px-3 py-2" onClick={onGoParticipants}>Ver participantes</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Ranking({ results }: { results: Results | null }) {
@@ -190,14 +235,44 @@ function CodesAdmin({ codes, onGenerate }: { codes: VoteCode[]; onGenerate: (qua
   );
 }
 
-function QrAdmin({ settings, participants, totalVotes, onDownload }: { settings: EventSettings; participants: Participant[]; totalVotes: number; onDownload: () => void }) {
+function QrAdmin({
+  settings,
+  participants,
+  totalVotes,
+  onDownload,
+  onDownloadRegistration,
+}: {
+  settings: EventSettings;
+  participants: Participant[];
+  totalVotes: number;
+  onDownload: () => void;
+  onDownloadRegistration: () => void;
+}) {
+  const registrationUrl = publicRegistrationUrl();
   const voteUrl = publicVotingUrl();
   const active = participants.filter((participant) => participant.active);
   const activeWithPhoto = active.filter((participant) => !!participant.photoUrl);
   const missingPhotos = active.length - activeWithPhoto.length;
   const configured = !!settings.eventDate && !!settings.eventTime && !!settings.timezone;
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className="card grid gap-4">
+        <div>
+          <p className="text-sm font-bold uppercase text-ember">QR Code de cadastro</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Cadastro</h2>
+          <p className="mt-2 text-white/65">Disponível para preparação, impressão e compartilhamento administrativo.</p>
+          <p className="mt-2 text-sm font-bold text-white/70">Status: {settings.registrationOpen ? 'Cadastros abertos' : 'Cadastros encerrados'}</p>
+        </div>
+        <div className="grid place-items-center rounded-lg border border-white/10 bg-white p-5">
+          <QRCodeSVG value={registrationUrl} size={300} bgColor="#ffffff" fgColor="#111111" />
+        </div>
+        <p className="break-all rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">{registrationUrl}</p>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" type="button" onClick={onDownloadRegistration}><Download className="h-4 w-4" /> Baixar QR</button>
+          <button className="btn-secondary" type="button" onClick={() => navigator.clipboard.writeText(registrationUrl)}><Copy className="h-4 w-4" /> Copiar link</button>
+          <a className="btn-secondary" href="/cadastro" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Abrir página</a>
+        </div>
+      </div>
       <div className="card grid gap-4">
         <div>
           <p className="text-sm font-bold uppercase text-ember">Configurações da votação</p>
@@ -210,6 +285,7 @@ function QrAdmin({ settings, participants, totalVotes, onDownload }: { settings:
         <p className="break-all rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">{voteUrl}</p>
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary" type="button" onClick={onDownload}><Download className="h-4 w-4" /> Baixar QR</button>
+          <button className="btn-secondary" type="button" onClick={() => navigator.clipboard.writeText(voteUrl)}><Copy className="h-4 w-4" /> Copiar link</button>
           <a className="btn-secondary" href="/admin/qr" target="_blank" rel="noreferrer"><Monitor className="h-4 w-4" /> Abrir tela cheia</a>
           <a className="btn-secondary" href="/votar" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Testar votação</a>
         </div>

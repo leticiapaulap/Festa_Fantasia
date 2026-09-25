@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { BackHomeLink } from '../components/BackHomeLink';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { SkeletonGrid } from '../components/SkeletonGrid';
 import { api, apiMessage } from '../services/api';
@@ -26,6 +27,7 @@ export function ParticipantsPage() {
 
   return (
     <section className="grid gap-5 py-6">
+      <BackHomeLink />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-bold uppercase text-ember">Participantes</p>

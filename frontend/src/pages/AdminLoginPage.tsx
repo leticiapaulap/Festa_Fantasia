@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LockKeyhole } from 'lucide-react';
+import { ArrowLeft, LockKeyhole } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../contexts/AuthContext';
 import { api, apiMessage, isApiConfigured } from '../services/api';
@@ -52,6 +52,9 @@ export function AdminLoginPage() {
   return (
     <main className="grid min-h-screen place-items-center px-4 py-10">
       <form className="card w-full max-w-md" onSubmit={handleSubmit(onSubmit)}>
+        <Link to="/" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-white/65 underline-offset-4 hover:text-white hover:underline">
+          <ArrowLeft className="h-4 w-4" /> Voltar para o site
+        </Link>
         <div className="mb-6 grid gap-2 text-center">
           <LockKeyhole className="mx-auto h-10 w-10 text-ember" />
           <h1 className="text-2xl font-black text-white">Painel Administrativo</h1>
