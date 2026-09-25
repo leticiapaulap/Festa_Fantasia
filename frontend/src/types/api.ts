@@ -72,6 +72,10 @@ export type LoginResponse = {
   email: string;
 };
 
+export type BootstrapStatus = {
+  available: boolean;
+};
+
 export type VoteListItem = {
   id: number;
   participantName: string;

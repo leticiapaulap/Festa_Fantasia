@@ -1,5 +1,6 @@
 package com.festafantasia.api.service;
 
+import com.festafantasia.api.dto.AuthDtos.BootstrapStatusResponse;
 import com.festafantasia.api.dto.AuthDtos.CreateAdminRequest;
 import com.festafantasia.api.dto.AuthDtos.LoginRequest;
 import com.festafantasia.api.dto.AuthDtos.LoginResponse;
@@ -25,11 +26,17 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
+    public BootstrapStatusResponse bootstrapStatus() {
+        return new BootstrapStatusResponse(repository.count() == 0);
+    }
+
+    @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        var admin = repository.findByEmailIgnoreCase(request.email())
-                .orElseThrow(() -> new BusinessException("E-mail ou senha inválidos.", HttpStatus.UNAUTHORIZED));
+        var email = normalizeEmail(request.email());
+        var admin = repository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new BusinessException("E-mail ou senha invalidos.", HttpStatus.UNAUTHORIZED));
         if (!passwordEncoder.matches(request.password(), admin.getPasswordHash())) {
-            throw new BusinessException("E-mail ou senha inválidos.", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException("E-mail ou senha invalidos.", HttpStatus.UNAUTHORIZED);
         }
         return new LoginResponse(jwtService.issue(admin), admin.getName(), admin.getEmail());
     }
@@ -37,13 +44,21 @@ public class AuthService {
     @Transactional
     public LoginResponse bootstrap(CreateAdminRequest request) {
         if (repository.count() > 0) {
-            throw new BusinessException("Administrador inicial já foi criado.", HttpStatus.CONFLICT);
+            throw new BusinessException("Administrador inicial ja foi criado.", HttpStatus.CONFLICT);
+        }
+        var email = normalizeEmail(request.email());
+        if (repository.existsByEmailIgnoreCase(email)) {
+            throw new BusinessException("Ja existe um administrador cadastrado.", HttpStatus.CONFLICT);
         }
         var admin = new AdminUser();
         admin.setName(request.name().trim());
-        admin.setEmail(request.email().trim().toLowerCase());
+        admin.setEmail(email);
         admin.setPasswordHash(passwordEncoder.encode(request.password()));
         repository.save(admin);
         return new LoginResponse(jwtService.issue(admin), admin.getName(), admin.getEmail());
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 }

@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LockKeyhole } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../contexts/AuthContext';
-import { apiMessage } from '../services/api';
+import { api, apiMessage, isApiConfigured } from '../services/api';
+import type { BootstrapStatus } from '../types/api';
 
 const schema = z.object({
   name: z.string().optional(),
@@ -19,8 +20,20 @@ type FormData = z.infer<typeof schema>;
 export function AdminLoginPage() {
   const { token, login, bootstrap } = useAuth();
   const [creating, setCreating] = useState(false);
+  const [bootstrapAvailable, setBootstrapAvailable] = useState(false);
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({ resolver: zodResolver(schema) });
+
+  useEffect(() => {
+    if (!isApiConfigured) {
+      setBootstrapAvailable(true);
+      return;
+    }
+    api.get<BootstrapStatus>('/admin/bootstrap/status')
+      .then(({ data }) => setBootstrapAvailable(data.available))
+      .catch(() => setBootstrapAvailable(false));
+  }, []);
+
   if (token) return <Navigate to="/admin/painel" replace />;
 
   async function onSubmit(values: FormData) {
@@ -61,11 +74,13 @@ export function AdminLoginPage() {
           {errors.password?.message && <span className="text-orange-200">{errors.password.message}</span>}
         </label>
         <button className="btn-primary w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Aguarde...' : creating ? 'Criar administrador inicial' : 'Entrar'}
+          {isSubmitting ? (creating ? 'Criando...' : 'Entrando...') : creating ? 'Criar administrador inicial' : 'Entrar'}
         </button>
-        <button type="button" className="btn-secondary mt-3 w-full" onClick={() => setCreating((value) => !value)}>
-          {creating ? 'Voltar ao login' : 'Criar administrador inicial'}
-        </button>
+        {bootstrapAvailable && (
+          <button type="button" className="btn-secondary mt-3 w-full" disabled={isSubmitting} onClick={() => setCreating((value) => !value)}>
+            {creating ? 'Voltar ao login' : 'Criar administrador inicial'}
+          </button>
+        )}
       </form>
     </main>
   );

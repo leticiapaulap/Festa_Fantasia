@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/bootstrap").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/admin/bootstrap/status").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/settings", "/api/participants", "/api/participants/*", "/api/results").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/participants", "/api/votes", "/api/vote-codes/validate").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

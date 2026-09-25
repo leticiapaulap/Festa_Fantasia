@@ -12,6 +12,8 @@ public class AuthDtos {
 
     public record LoginResponse(String token, String name, String email) {}
 
+    public record BootstrapStatusResponse(boolean available) {}
+
     public record CreateAdminRequest(
             @NotBlank @Size(max = 120) String name,
             @Email @NotBlank @Size(max = 160) String email,

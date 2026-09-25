@@ -1,6 +1,7 @@
 package com.festafantasia.api.controller;
 
 import com.festafantasia.api.dto.AdminDtos.ResetVotesRequest;
+import com.festafantasia.api.dto.AuthDtos.BootstrapStatusResponse;
 import com.festafantasia.api.dto.AuthDtos.CreateAdminRequest;
 import com.festafantasia.api.dto.AuthDtos.LoginRequest;
 import com.festafantasia.api.dto.AuthDtos.LoginResponse;
@@ -52,6 +53,11 @@ public class AdminController {
     @PostMapping("/bootstrap")
     public LoginResponse bootstrap(@Valid @RequestBody CreateAdminRequest request) {
         return authService.bootstrap(request);
+    }
+
+    @GetMapping("/bootstrap/status")
+    public BootstrapStatusResponse bootstrapStatus() {
+        return authService.bootstrapStatus();
     }
 
     @GetMapping("/dashboard")
