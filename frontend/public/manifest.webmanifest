@@ -1,0 +1,9 @@
+{
+  "name": "Halloween",
+  "short_name": "Halloween",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0712",
+  "theme_color": "#0b0712",
+  "description": "Sistema de cadastro e votação do Halloween."
+}
