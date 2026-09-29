@@ -17,6 +17,12 @@ api.interceptors.request.use((config) => {
 });
 
 export function apiMessage(error: unknown) {
+  if (error instanceof Error && error.message === 'INVALID_SETTINGS_RESPONSE') {
+    return 'A API de configurações respondeu em formato inválido. Verifique VITE_API_URL no deployment.';
+  }
+  if (error instanceof Error && error.message === 'INVALID_PARTICIPANTS_RESPONSE') {
+    return 'A API de participantes respondeu em formato inválido. Verifique VITE_API_URL no deployment.';
+  }
   if (axios.isAxiosError(error)) {
     if (!error.response) {
       return 'Não foi possível conectar à API. Verifique a URL pública do backend.';

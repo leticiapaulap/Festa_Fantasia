@@ -2,16 +2,22 @@ import { Link } from 'react-router-dom';
 import { CalendarClock, LockKeyhole, QrCode, Share2, Trophy, Users, Vote } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api } from '../services/api';
+import { api, apiMessage } from '../services/api';
 import { eventPhase, formatEventDate } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
 import type { EventSettings } from '../types/api';
 
 export function HomePage() {
   const [settings, setSettings] = useState<EventSettings | null>(null);
+  const [settingsError, setSettingsError] = useState('');
 
   useEffect(() => {
-    api.get<EventSettings>('/settings').then(({ data }) => setSettings(data)).catch(() => undefined);
+    api.get<EventSettings>('/settings')
+      .then(({ data }) => {
+        if (typeof data?.registrationOpen !== 'boolean') throw new Error('INVALID_SETTINGS_RESPONSE');
+        setSettings(data);
+      })
+      .catch((error) => setSettingsError(apiMessage(error)));
   }, []);
 
   const phase = eventPhase(settings);
@@ -32,6 +38,11 @@ export function HomePage() {
         </p>
         <h1 className="max-w-3xl text-4xl font-black uppercase leading-tight text-white sm:text-5xl lg:text-6xl">Halloween</h1>
         {eventDate && <p className="mt-3 text-sm font-semibold uppercase text-white/55">{eventDate}</p>}
+        {settingsError && (
+          <p className="mt-3 max-w-2xl rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-100">
+            Não foi possível confirmar as configurações agora. O cadastro continua disponível; se a listagem não carregar, verifique a URL pública da API.
+          </p>
+        )}
 
         {phase === 'REGISTRATION' && (
           <>

@@ -14,7 +14,10 @@ export function ParticipantsPage() {
 
   useEffect(() => {
     api.get<Participant[]>('/participants')
-      .then(({ data }) => setParticipants(data))
+      .then(({ data }) => {
+        if (!Array.isArray(data)) throw new Error('INVALID_PARTICIPANTS_RESPONSE');
+        setParticipants(data);
+      })
       .catch((err) => setError(apiMessage(err)))
       .finally(() => setLoading(false));
   }, []);

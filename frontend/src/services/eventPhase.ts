@@ -3,7 +3,7 @@ import type { EventSettings } from '../types/api';
 export type EventPhase = 'REGISTRATION' | 'PREPARATION' | 'VOTING' | 'FINISHED';
 
 export function eventPhase(settings: EventSettings | null): EventPhase {
-  if (!settings) return 'PREPARATION';
+  if (!settings) return 'REGISTRATION';
   if (settings.votingStatus === 'CLOSED' || settings.votingAvailability === 'AFTER_WINDOW') return 'FINISHED';
   if (settings.canAcceptVotes) return 'VOTING';
   if (settings.registrationOpen) return 'REGISTRATION';
@@ -18,7 +18,7 @@ export function votingStatusLabel(settings: EventSettings | null) {
 }
 
 export function registrationStatusLabel(settings: EventSettings | null) {
-  return settings?.registrationOpen ? 'Abertos' : 'Encerrados';
+  return settings?.registrationOpen === false ? 'Encerrados' : 'Abertos';
 }
 
 export function formatEventDate(settings: EventSettings | null) {
