@@ -3,6 +3,8 @@ package com.festafantasia.api.controller;
 import com.festafantasia.api.dto.EventDtos.EventSettingsResponse;
 import com.festafantasia.api.dto.ParticipantDtos.ParticipantRequest;
 import com.festafantasia.api.dto.ParticipantDtos.ParticipantResponse;
+import com.festafantasia.api.dto.RegistrationDtos.AccessRequest;
+import com.festafantasia.api.dto.RegistrationDtos.AccessResponse;
 import com.festafantasia.api.dto.ResultDtos.ResultsResponse;
 import com.festafantasia.api.dto.VoteDtos.ValidateCodeRequest;
 import com.festafantasia.api.dto.VoteDtos.ValidateCodeResponse;
@@ -10,6 +12,7 @@ import com.festafantasia.api.dto.VoteDtos.VoteRequest;
 import com.festafantasia.api.dto.VoteDtos.VoteResponse;
 import com.festafantasia.api.service.*;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +28,15 @@ public class PublicController {
     private final VoteCodeService voteCodeService;
     private final ResultService resultService;
     private final EventSettingsService settingsService;
+    private final RegistrationAccessService registrationAccessService;
 
-    public PublicController(ParticipantService participantService, VoteService voteService, VoteCodeService voteCodeService, ResultService resultService, EventSettingsService settingsService) {
+    public PublicController(ParticipantService participantService, VoteService voteService, VoteCodeService voteCodeService, ResultService resultService, EventSettingsService settingsService, RegistrationAccessService registrationAccessService) {
         this.participantService = participantService;
         this.voteService = voteService;
         this.voteCodeService = voteCodeService;
         this.resultService = resultService;
         this.settingsService = settingsService;
+        this.registrationAccessService = registrationAccessService;
     }
 
     @GetMapping("/settings")
@@ -39,10 +44,15 @@ public class PublicController {
         return settingsService.current();
     }
 
+    @PostMapping("/registration/access")
+    public AccessResponse registrationAccess(@Valid @RequestBody AccessRequest request, HttpServletRequest servletRequest) {
+        return registrationAccessService.grant(request.code(), servletRequest);
+    }
+
     @PostMapping("/participants")
     @ResponseStatus(HttpStatus.CREATED)
-    public ParticipantResponse createParticipant(@Valid @RequestBody ParticipantRequest request) {
-        return participantService.create(request);
+    public ParticipantResponse createParticipant(@Valid @RequestBody ParticipantRequest request, @RequestHeader(value = "X-Registration-Access", required = false) String accessToken) {
+        return participantService.create(request, accessToken);
     }
 
     @PostMapping(value = "/participants", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -51,9 +61,10 @@ public class PublicController {
             @RequestParam String name,
             @RequestParam String costumeName,
             @RequestParam(required = false) String description,
-            @RequestPart(required = false) MultipartFile photo
+            @RequestPart(required = false) MultipartFile photo,
+            @RequestHeader(value = "X-Registration-Access", required = false) String accessToken
     ) {
-        return participantService.create(name, costumeName, description, photo);
+        return participantService.create(name, costumeName, description, photo, accessToken);
     }
 
     @GetMapping("/participants")

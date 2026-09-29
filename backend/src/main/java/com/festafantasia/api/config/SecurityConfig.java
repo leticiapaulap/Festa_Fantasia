@@ -27,7 +27,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/admin/bootstrap").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/admin/bootstrap/status").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/settings", "/api/participants", "/api/participants/*", "/api/results").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/participants", "/api/votes", "/api/vote-codes/validate").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/registration/access", "/api/participants", "/api/votes", "/api/vote-codes/validate").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

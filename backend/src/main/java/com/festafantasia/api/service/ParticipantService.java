@@ -19,12 +19,14 @@ public class ParticipantService {
     private final EventSettingsService settingsService;
     private final VoteRepository voteRepository;
     private final PhotoStorageService photoStorageService;
+    private final RegistrationAccessService registrationAccessService;
 
-    public ParticipantService(ParticipantRepository repository, EventSettingsService settingsService, VoteRepository voteRepository, PhotoStorageService photoStorageService) {
+    public ParticipantService(ParticipantRepository repository, EventSettingsService settingsService, VoteRepository voteRepository, PhotoStorageService photoStorageService, RegistrationAccessService registrationAccessService) {
         this.repository = repository;
         this.settingsService = settingsService;
         this.voteRepository = voteRepository;
         this.photoStorageService = photoStorageService;
+        this.registrationAccessService = registrationAccessService;
     }
 
     @Transactional
@@ -39,7 +41,14 @@ public class ParticipantService {
     }
 
     @Transactional
-    public ParticipantResponse create(String name, String costumeName, String description, MultipartFile photo) {
+    public ParticipantResponse create(ParticipantRequest request, String accessToken) {
+        registrationAccessService.requireValid(accessToken);
+        throw new BusinessException("Envie a foto pelo formulário de cadastro.", HttpStatus.BAD_REQUEST);
+    }
+
+    @Transactional
+    public ParticipantResponse create(String name, String costumeName, String description, MultipartFile photo, String accessToken) {
+        registrationAccessService.requireValid(accessToken);
         var settings = settingsService.currentEntity();
         if (!settings.isRegistrationOpen() || settingsService.canAcceptVotes(settings)) {
             throw new BusinessException("O período de cadastro foi encerrado.", HttpStatus.CONFLICT);

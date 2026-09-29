@@ -130,6 +130,11 @@ export function AdminDashboardPage() {
         <Metric label="Status" value={dashboard?.status ?? '...'} />
       </div>
       <div className="flex flex-wrap gap-2">
+        {settings && (
+          <button className={settings.registrationOpen ? 'btn-secondary' : 'btn-primary'} onClick={() => saveSettings({ ...settings, registrationOpen: !settings.registrationOpen })}>
+            {settings.registrationOpen ? 'Encerrar cadastros' : 'Abrir cadastros'}
+          </button>
+        )}
         <button className="btn-primary" onClick={() => toggleVoting(true)}>Abrir votação</button>
         <button className="btn-secondary" onClick={() => toggleVoting(false)}>Encerrar votação</button>
       </div>
@@ -326,14 +331,14 @@ function QrAdmin({
           <p className="mt-2 text-white/65">Disponível para preparação, impressão e compartilhamento administrativo.</p>
           <p className="mt-2 text-sm font-bold text-white/70">Status: {settings.registrationOpen ? 'Cadastros abertos' : 'Cadastros encerrados'}</p>
         </div>
-        <div className="grid place-items-center rounded-lg border border-white/10 bg-white p-5">
-          <QRCodeSVG value={registrationUrl} size={300} bgColor="#ffffff" fgColor="#111111" />
+        <div className="mx-auto grid aspect-square w-[min(300px,78vw)] place-items-center rounded-lg border border-white/10 bg-white p-5">
+          <QRCodeSVG value={registrationUrl} className="h-full w-full" bgColor="#ffffff" fgColor="#111111" marginSize={4} />
         </div>
         <p className="break-all rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">{registrationUrl}</p>
         <div className="flex flex-wrap gap-2">
+          <a className="btn-secondary" href="/cadastro" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Abrir página</a>
           <button className="btn-primary" type="button" onClick={onDownloadRegistration}><Download className="h-4 w-4" /> Baixar QR</button>
           <button className="btn-secondary" type="button" onClick={() => navigator.clipboard.writeText(registrationUrl)}><Copy className="h-4 w-4" /> Copiar link</button>
-          <a className="btn-secondary" href="/cadastro" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Abrir página</a>
         </div>
       </div>
       <div className="card grid gap-4">
@@ -343,15 +348,15 @@ function QrAdmin({
           <p className="mt-2 text-white/65">Pré-visualização administrativa. O QR ainda não está público antes da janela e do status OPEN.</p>
           <p className="mt-2 text-sm font-bold text-white/70">Status: {votingStatusLabel(settings)}</p>
         </div>
-        <div className="grid place-items-center rounded-lg border border-white/10 bg-white p-5">
-          <QRCodeSVG value={voteUrl} size={300} bgColor="#ffffff" fgColor="#111111" />
+        <div className="mx-auto grid aspect-square w-[min(300px,78vw)] place-items-center rounded-lg border border-white/10 bg-white p-5">
+          <QRCodeSVG value={voteUrl} className="h-full w-full" bgColor="#ffffff" fgColor="#111111" marginSize={4} />
         </div>
         <p className="break-all rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/65">{voteUrl}</p>
         <div className="flex flex-wrap gap-2">
+          <a className="btn-secondary" href="/votar" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Pré-visualizar</a>
           <button className="btn-primary" type="button" onClick={onDownload}><Download className="h-4 w-4" /> Baixar QR</button>
           <button className="btn-secondary" type="button" onClick={() => navigator.clipboard.writeText(voteUrl)}><Copy className="h-4 w-4" /> Copiar link</button>
           <a className="btn-secondary" href="/admin/qr" target="_blank" rel="noreferrer"><Monitor className="h-4 w-4" /> Abrir tela cheia</a>
-          <a className="btn-secondary" href="/votar" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Testar votação</a>
         </div>
       </div>
       <div className="card grid content-start gap-3">

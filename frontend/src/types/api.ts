@@ -76,6 +76,11 @@ export type BootstrapStatus = {
   available: boolean;
 };
 
+export type RegistrationAccessResponse = {
+  token: string;
+  expiresInMinutes: number;
+};
+
 export type VoteListItem = {
   id: number;
   participantName: string;

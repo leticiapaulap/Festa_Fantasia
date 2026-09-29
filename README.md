@@ -37,12 +37,13 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 MAX_PHOTO_SIZE_MB=5
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_UPLOAD_PRESET=
+REGISTRATION_ACCESS_CODE=
 ```
 
 Frontend (`frontend/.env.example`):
 
 ```env
-VITE_API_URL=http://localhost:8080/api
+VITE_API_URL=
 VITE_APP_URL=http://localhost:5173
 ```
 
@@ -105,13 +106,14 @@ Backend:
 - Configure PostgreSQL gerenciado.
 - Defina `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET` e `CORS_ALLOWED_ORIGINS`.
 - Defina `CLOUDINARY_CLOUD_NAME` e `CLOUDINARY_UPLOAD_PRESET` para persistir fotos em produção.
+- Defina `REGISTRATION_ACCESS_CODE` somente no backend. Não use `VITE_` para esse código.
 - Para Neon, use a URL JDBC no backend, por exemplo `jdbc:postgresql://HOST/neondb?sslmode=require`, junto com `DATABASE_USERNAME` e `DATABASE_PASSWORD`.
 - Configure `CORS_ALLOWED_ORIGINS` com a URL da Vercel, por exemplo `https://seu-projeto.vercel.app`.
 
 Frontend:
 
 - Vercel.
-- Defina `VITE_API_URL` apontando para a URL pública do backend com `/api`.
+- Como o frontend da Vercel e o backend Spring podem estar separados, defina `VITE_API_URL` apontando para a URL pública do backend com `/api` quando a API não estiver no mesmo domínio. Não coloque segredos em variáveis `VITE_*`.
 - Se o projeto Vercel estiver apontando para a raiz do repositório, o `vercel.json` já manda instalar e buildar dentro de `frontend/`.
 - Neon hospeda apenas o PostgreSQL. O frontend da Vercel ainda precisa de uma API Java publicada em Railway, Render ou serviço equivalente.
 

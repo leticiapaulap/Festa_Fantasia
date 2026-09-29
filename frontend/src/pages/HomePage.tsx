@@ -25,7 +25,7 @@ export function HomePage() {
   const copyRegistration = () => navigator.clipboard?.writeText(registrationUrl);
 
   return (
-    <section className="grid gap-6 py-4 md:grid-cols-[1.05fr_0.95fr] md:items-center md:py-10">
+    <section className="grid gap-6 py-4 md:grid-cols-[1.02fr_minmax(20rem,0.98fr)] md:items-center md:py-10">
       <div className="py-6">
         <p className="mb-3 inline-flex rounded-full border border-ember/35 bg-ember/10 px-3 py-1 text-sm font-bold uppercase text-ember">
           Concurso da noite
@@ -89,11 +89,12 @@ export function HomePage() {
       <aside className="card">
         {phase === 'REGISTRATION' && (
           <QrPanel
-            title="CADASTROS ABERTOS"
-            description="Escaneie para cadastrar sua fantasia pelo celular."
+            title="CADASTRO"
+            description="Escaneie para acessar o cadastro."
             value={registrationUrl}
             footerTitle="Votação"
-            footerText="Será liberada durante a festa."
+            footerText="Aguardando o dia do evento."
+            note="É necessário possuir o código fornecido pela organização."
             action={<Link className="btn-primary md:hidden" to="/cadastro">Cadastrar minha fantasia</Link>}
             extra={<button className="btn-secondary md:hidden" type="button" onClick={copyRegistration}><Share2 className="h-4 w-4" /> Copiar link</button>}
           />
@@ -103,6 +104,7 @@ export function HomePage() {
             title="VOTAÇÃO ABERTA"
             description="Escaneie para votar na sua fantasia favorita."
             value={voteUrl}
+            variant="vote"
             action={<Link className="btn-primary md:hidden" to="/votar">Votar agora</Link>}
           />
         )}
@@ -132,6 +134,8 @@ function QrPanel({
   extra,
   footerTitle,
   footerText,
+  note,
+  variant = 'registration',
 }: {
   title: string;
   description: string;
@@ -140,17 +144,20 @@ function QrPanel({
   extra?: ReactNode;
   footerTitle?: string;
   footerText?: string;
+  note?: string;
+  variant?: 'registration' | 'vote';
 }) {
   return (
-    <div className="grid gap-4">
+    <div className="mx-auto grid w-full max-w-[24rem] gap-4">
       <div className="flex items-center gap-3">
         <QrCode className="h-6 w-6 text-ember" />
         <h2 className="text-xl font-bold">{title}</h2>
       </div>
       <p className="text-white/70">{description}</p>
-      <div className="mx-auto w-fit rounded-lg bg-white p-3">
-        <QRCodeSVG value={value} size={220} bgColor="#ffffff" fgColor="#111111" />
+      <div className="mx-auto grid aspect-square w-[min(220px,75vw)] place-items-center rounded-lg bg-white p-4 shadow-glow md:w-[260px]">
+        <QRCodeSVG value={value} className="h-full w-full" bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       </div>
+      {note && <p className="text-sm font-semibold text-amber-100">{note}</p>}
       <p className="break-all text-xs text-white/50">{value}</p>
       {action}
       {extra}
@@ -159,6 +166,9 @@ function QrPanel({
           <p className="font-bold text-white">{footerTitle}</p>
           <p>{footerText}</p>
         </div>
+      )}
+      {variant === 'vote' && (
+        <p className="text-sm text-white/55">QR de votação separado do cadastro.</p>
       )}
     </div>
   );

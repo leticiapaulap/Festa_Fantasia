@@ -6,7 +6,7 @@ export function eventPhase(settings: EventSettings | null): EventPhase {
   if (!settings) return 'PREPARATION';
   if (settings.votingStatus === 'CLOSED' || settings.votingAvailability === 'AFTER_WINDOW') return 'FINISHED';
   if (settings.canAcceptVotes) return 'VOTING';
-  if (settings.registrationOpen && settings.votingStatus === 'DRAFT') return 'REGISTRATION';
+  if (settings.registrationOpen) return 'REGISTRATION';
   return 'PREPARATION';
 }
 
