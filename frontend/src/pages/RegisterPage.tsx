@@ -29,6 +29,10 @@ export function RegisterPage() {
   }, []);
 
   async function onSubmit(values: FormData) {
+    if (!photo) {
+      toast.error('Selecione uma imagem para upload.');
+      return;
+    }
     try {
       const payload = new FormData();
       payload.append('name', values.name);
@@ -39,7 +43,7 @@ export function RegisterPage() {
       setCreated(data);
       setPhoto(null);
       reset();
-      toast.success('Fantasia cadastrada com sucesso!');
+      toast.success('Cadastro realizado com sucesso!');
     } catch (error) {
       toast.error(apiMessage(error));
     }
@@ -71,13 +75,13 @@ export function RegisterPage() {
         <PhotoUpload file={photo} onChange={setPhoto} />
         <Field label="Descrição" error={errors.description?.message}><textarea className="input min-h-28 resize-y" {...register('description')} /></Field>
         <button className="btn-primary w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Salvando...' : <><Camera className="h-4 w-4" /> Salvar fantasia</>}
+          {isSubmitting ? 'Cadastrando...' : <><Camera className="h-4 w-4" /> Cadastrar fantasia</>}
         </button>
       </form>
       {created && (
         <div className="grid gap-4">
           <div className="flex items-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 p-4 text-emerald-100">
-            <CheckCircle2 className="h-5 w-5" /> Fantasia cadastrada com sucesso!
+            <CheckCircle2 className="h-5 w-5" /> Cadastro realizado com sucesso!
           </div>
           <ParticipantCard participant={created} />
         </div>

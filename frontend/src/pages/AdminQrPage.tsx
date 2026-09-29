@@ -20,7 +20,7 @@ export function AdminQrPage() {
   return (
     <main className="grid min-h-screen place-items-center px-6 py-8 text-center">
       <Link to="/" className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-bold text-white/65 hover:bg-white/10 hover:text-white">
-        <ArrowLeft className="h-4 w-4" /> Site
+        <ArrowLeft className="h-4 w-4" /> Voltar para o site
       </Link>
       <div className="grid w-full max-w-5xl place-items-center gap-8">
         <div>

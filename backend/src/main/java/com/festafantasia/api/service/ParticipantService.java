@@ -44,7 +44,16 @@ public class ParticipantService {
         if (!settings.isRegistrationOpen() || settingsService.canAcceptVotes(settings)) {
             throw new BusinessException("O período de cadastro foi encerrado.", HttpStatus.CONFLICT);
         }
-        return createAdmin(name, costumeName, description, photo);
+        if (photo == null || photo.isEmpty()) {
+            throw new BusinessException("Selecione uma imagem para upload.", HttpStatus.BAD_REQUEST);
+        }
+        var participant = new Participant();
+        participant.setName(clean(name));
+        participant.setCostumeName(clean(costumeName));
+        participant.setDescription(clean(description));
+        participant.setActive(true);
+        participant.setPhotoUrl(photoStorageService.uploadParticipantPhoto(photo));
+        return toResponse(repository.save(participant));
     }
 
     @Transactional

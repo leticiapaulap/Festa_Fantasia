@@ -10,11 +10,11 @@ export function AdminHeader() {
     <header className="mb-5 grid gap-3 sm:flex sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-3">
         <Link to="/" className="btn-secondary min-h-10 px-3 py-2 normal-case">
-          <ArrowLeft className="h-4 w-4" /> Site
+          <ArrowLeft className="h-4 w-4" /> Voltar para o site
         </Link>
         <div>
           <p className="text-sm uppercase text-ember">Halloween</p>
-          <h1 className="text-2xl font-black text-white">Área administrativa</h1>
+          <h1 className="text-2xl font-black text-white">Painel Administrativo</h1>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">

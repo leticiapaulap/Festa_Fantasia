@@ -35,12 +35,15 @@ DATABASE_PASSWORD=postgres
 JWT_SECRET=troque-por-uma-chave-com-pelo-menos-32-caracteres
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 MAX_PHOTO_SIZE_MB=5
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_UPLOAD_PRESET=
 ```
 
 Frontend (`frontend/.env.example`):
 
 ```env
 VITE_API_URL=http://localhost:8080/api
+VITE_APP_URL=http://localhost:5173
 ```
 
 ## Como Executar Localmente
@@ -101,6 +104,7 @@ Backend:
 - Railway ou Render.
 - Configure PostgreSQL gerenciado.
 - Defina `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET` e `CORS_ALLOWED_ORIGINS`.
+- Defina `CLOUDINARY_CLOUD_NAME` e `CLOUDINARY_UPLOAD_PRESET` para persistir fotos em produção.
 - Para Neon, use a URL JDBC no backend, por exemplo `jdbc:postgresql://HOST/neondb?sslmode=require`, junto com `DATABASE_USERNAME` e `DATABASE_PASSWORD`.
 - Configure `CORS_ALLOWED_ORIGINS` com a URL da Vercel, por exemplo `https://seu-projeto.vercel.app`.
 
@@ -118,7 +122,7 @@ Banco:
 
 ## Upload de Fotos
 
-A aplicação salva `photoUrl` no banco e não grava arquivos dentro do projeto. Para produção, conecte Cloudinary, S3 ou equivalente em uma rota de upload e grave somente a URL retornada.
+A aplicação salva `photoUrl` no banco e não grava arquivos dentro do projeto. O storage configurado neste projeto é Cloudinary via upload preset; o usuário escolhe um arquivo e o backend grava somente a URL segura retornada.
 
 ## Testes e Build
 

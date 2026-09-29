@@ -1,9 +1,10 @@
-import { Copy, Download, Edit3, ExternalLink, Monitor, Trash2 } from 'lucide-react';
+import { Copy, Download, Edit3, ExternalLink, Monitor, Plus, Trash2 } from 'lucide-react';
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 import { ParticipantCard } from '../components/ParticipantCard';
+import { PhotoUpload } from '../components/PhotoUpload';
 import { api, apiMessage } from '../services/api';
 import { formatEventDate, registrationStatusLabel, votingStatusLabel } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
@@ -19,6 +20,7 @@ export function AdminDashboardPage() {
   const [codes, setCodes] = useState<VoteCode[]>([]);
   const [settings, setSettings] = useState<EventSettings | null>(null);
   const [editing, setEditing] = useState<Participant | null>(null);
+  const [creating, setCreating] = useState(false);
 
   async function load() {
     const [dash, res, people, voteCodes, eventSettings] = await Promise.all([
@@ -74,9 +76,23 @@ export function AdminDashboardPage() {
     }
   }
 
-  async function saveParticipant(values: Participant) {
+  async function createParticipant(values: ParticipantFormValues) {
     try {
-      await api.put(`/admin/participants/${values.id}`, values);
+      const payload = participantPayload(values);
+      await api.post('/admin/participants', payload);
+      setCreating(false);
+      toast.success('Participante cadastrado.');
+      await load();
+    } catch (error) {
+      toast.error(apiMessage(error));
+    }
+  }
+
+  async function saveParticipant(values: ParticipantFormValues) {
+    if (!values.id) return;
+    try {
+      const payload = participantPayload(values);
+      await api.put(`/admin/participants/${values.id}`, payload);
       setEditing(null);
       toast.success('Participante atualizado.');
       await load();
@@ -125,7 +141,7 @@ export function AdminDashboardPage() {
         ))}
       </div>
       {tab === 'summary' && settings && <SummaryAdmin settings={settings} participants={participants} totalVotes={dashboard?.votes ?? 0} onGoParticipants={() => setTab('participants')} />}
-      {tab === 'participants' && <ParticipantsAdmin participants={participants} onEdit={setEditing} onDelete={removeParticipant} />}
+      {tab === 'participants' && <ParticipantsAdmin participants={participants} onCreate={() => setCreating(true)} onEdit={setEditing} onDelete={removeParticipant} />}
       {tab === 'codes' && <CodesAdmin codes={codes} onGenerate={generateCodes} />}
       {tab === 'qr' && settings && (
         <QrAdmin
@@ -140,9 +156,43 @@ export function AdminDashboardPage() {
       {tab === 'settings' && settings && <SettingsAdmin settings={settings} onSave={saveSettings} />}
       <QRCodeCanvas id="admin-registration-qr-download" className="hidden" value={publicRegistrationUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       <QRCodeCanvas id="admin-voting-qr-download" className="hidden" value={publicVotingUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
-      <EditParticipantModal participant={editing} onClose={() => setEditing(null)} onSave={saveParticipant} />
+      <ParticipantModal
+        open={creating}
+        title="Cadastrar participante"
+        onClose={() => setCreating(false)}
+        onSave={createParticipant}
+      />
+      <ParticipantModal
+        participant={editing}
+        open={!!editing}
+        title="Editar participante"
+        onClose={() => setEditing(null)}
+        onSave={saveParticipant}
+      />
     </section>
   );
+}
+
+type ParticipantFormValues = {
+  id?: number;
+  name: string;
+  costumeName: string;
+  description?: string | null;
+  active: boolean;
+  photoUrl?: string | null;
+  photo?: File | null;
+  removePhoto?: boolean;
+};
+
+function participantPayload(values: ParticipantFormValues) {
+  const payload = new FormData();
+  payload.append('name', values.name);
+  payload.append('costumeName', values.costumeName);
+  if (values.description?.trim()) payload.append('description', values.description.trim());
+  payload.append('active', String(values.active));
+  if (values.removePhoto) payload.append('removePhoto', 'true');
+  if (values.photo) payload.append('photo', values.photo);
+  return payload;
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
@@ -198,12 +248,25 @@ function Ranking({ results }: { results: Results | null }) {
   );
 }
 
-function ParticipantsAdmin({ participants, onEdit, onDelete }: { participants: Participant[]; onEdit: (p: Participant) => void; onDelete: (id: number) => void }) {
+function ParticipantsAdmin({
+  participants,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  participants: Participant[];
+  onCreate: () => void;
+  onEdit: (p: Participant) => void;
+  onDelete: (id: number) => void;
+}) {
   return (
     <div className="grid gap-3">
+      <div className="flex justify-end">
+        <button className="btn-primary" onClick={onCreate}><Plus className="h-4 w-4" /> Cadastrar participante</button>
+      </div>
       {participants.map((participant) => (
         <div key={participant.id} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="font-bold text-white">{participant.name}</p><p className="text-ember">{participant.costumeName}</p></div>
+          <div><p className="font-bold text-white">{participant.name}</p><p className="text-ember">{participant.costumeName}</p><p className="text-sm text-white/50">{participant.photoUrl ? 'Foto cadastrada' : 'Sem foto'}</p></div>
           <div className="flex gap-2">
             <button className="btn-secondary" onClick={() => onEdit(participant)}><Edit3 className="h-4 w-4" /> Editar</button>
             <button className="btn-secondary" onClick={() => onDelete(participant.id)}><Trash2 className="h-4 w-4" /> Excluir</button>
@@ -278,6 +341,7 @@ function QrAdmin({
           <p className="text-sm font-bold uppercase text-ember">QR Code de Votação — Halloween</p>
           <h2 className="mt-1 text-2xl font-black text-white">Votação</h2>
           <p className="mt-2 text-white/65">Pré-visualização administrativa. O QR ainda não está público antes da janela e do status OPEN.</p>
+          <p className="mt-2 text-sm font-bold text-white/70">Status: {votingStatusLabel(settings)}</p>
         </div>
         <div className="grid place-items-center rounded-lg border border-white/10 bg-white p-5">
           <QRCodeSVG value={voteUrl} size={300} bgColor="#ffffff" fgColor="#111111" />
@@ -339,19 +403,68 @@ function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: 
   );
 }
 
-function EditParticipantModal({ participant, onClose, onSave }: { participant: Participant | null; onClose: () => void; onSave: (p: Participant) => void }) {
-  const [draft, setDraft] = useState<Participant | null>(participant);
-  useEffect(() => setDraft(participant), [participant]);
-  if (!draft) return null;
+function ParticipantModal({
+  participant,
+  open,
+  title,
+  onClose,
+  onSave,
+}: {
+  participant?: Participant | null;
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  onSave: (p: ParticipantFormValues) => void;
+}) {
+  const [draft, setDraft] = useState<ParticipantFormValues>(() => participantToForm(participant));
+  const [photo, setPhoto] = useState<File | null>(null);
+  useEffect(() => {
+    setDraft(participantToForm(participant));
+    setPhoto(null);
+  }, [participant, open]);
+  if (!open) return null;
   return (
-    <Modal open={!!participant} title="Editar participante" onClose={onClose}>
-      <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); onSave(draft); }}>
-        <input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <input className="input" value={draft.costumeName} onChange={(e) => setDraft({ ...draft, costumeName: e.target.value })} />
-        <input className="input" value={draft.photoUrl ?? ''} onChange={(e) => setDraft({ ...draft, photoUrl: e.target.value })} />
-        <textarea className="input min-h-24" value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+    <Modal open={open} title={title} onClose={onClose}>
+      <form className="grid gap-3" onSubmit={(event) => {
+        event.preventDefault();
+        onSave({ ...draft, photo });
+      }}>
+        <label className="grid gap-2 text-sm font-semibold text-white/80">
+          Nome do participante
+          <input className="input" required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-white/80">
+          Nome da fantasia
+          <input className="input" required value={draft.costumeName} onChange={(e) => setDraft({ ...draft, costumeName: e.target.value })} />
+        </label>
+        <PhotoUpload
+          file={photo}
+          onChange={(file) => {
+            setPhoto(file);
+            if (file) setDraft({ ...draft, removePhoto: false });
+          }}
+          currentUrl={draft.removePhoto ? null : draft.photoUrl}
+          onRemoveCurrent={() => setDraft({ ...draft, removePhoto: true })}
+        />
+        <label className="grid gap-2 text-sm font-semibold text-white/80">
+          Descrição
+          <textarea className="input min-h-24" value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        </label>
+        <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /> Participante ativo</label>
         <button className="btn-primary">Salvar</button>
       </form>
     </Modal>
   );
+}
+
+function participantToForm(participant?: Participant | null): ParticipantFormValues {
+  return {
+    id: participant?.id,
+    name: participant?.name ?? '',
+    costumeName: participant?.costumeName ?? '',
+    description: participant?.description ?? '',
+    active: participant?.active ?? true,
+    photoUrl: participant?.photoUrl ?? null,
+    removePhoto: false,
+  };
 }

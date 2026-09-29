@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -70,6 +71,8 @@ public class PhotoStorageService {
             return secureUrl.toString();
         } catch (IOException ex) {
             throw new BusinessException("Não foi possível ler a imagem enviada.", HttpStatus.BAD_REQUEST);
+        } catch (RestClientException ex) {
+            throw new BusinessException("Upload da foto falhou. Verifique a configuração do Cloudinary.", HttpStatus.BAD_GATEWAY);
         }
     }
 
