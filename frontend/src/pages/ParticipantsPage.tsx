@@ -35,9 +35,15 @@ export function ParticipantsPage() {
           <p className="text-sm font-bold uppercase text-ember">Participantes</p>
           <h1 className="mt-2 text-3xl font-black text-white">Conheça as fantasias</h1>
         </div>
-        <label className="relative w-full sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-white/45" />
-          <input className="input pl-11" placeholder="Buscar por nome ou fantasia" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <label className="relative block min-w-0 w-full sm:max-w-sm">
+          <span className="sr-only">Buscar participantes por nome ou fantasia</span>
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/50" aria-hidden="true" />
+          <input
+            className="input pl-12 pr-4 placeholder:text-white/50 hover:border-white/20"
+            placeholder="Buscar por nome ou fantasia"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </label>
       </div>
       {loading && <SkeletonGrid />}

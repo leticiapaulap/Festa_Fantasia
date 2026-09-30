@@ -435,7 +435,7 @@ function ParticipantModal({
         onSave({ ...draft, photo });
       }}>
         <label className="grid gap-2 text-sm font-semibold text-white/80">
-          Nome do participante
+          Nome do participante ou grupo
           <input className="input" required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-white/80">

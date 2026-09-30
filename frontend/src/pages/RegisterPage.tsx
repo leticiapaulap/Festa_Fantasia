@@ -13,7 +13,7 @@ import { useEventSettings } from '../services/useEventSettings';
 import type { Participant } from '../types/api';
 
 const schema = z.object({
-  name: z.string().min(2, 'Informe seu nome.'),
+  name: z.string().min(2, 'Informe o nome do participante ou grupo.'),
   costumeName: z.string().min(2, 'Informe o nome da fantasia.'),
   description: z.string().max(600, 'Descrição muito longa.').optional(),
 });
@@ -88,7 +88,7 @@ export function RegisterPage() {
             <h1 className="mt-2 text-3xl font-black text-white">Cadastrar minha fantasia</h1>
           </div>
           <form className="card grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-        <Field label="Nome do participante" error={errors.name?.message}><input className="input" {...register('name')} /></Field>
+        <Field label="Nome do participante ou grupo" error={errors.name?.message}><input className="input" placeholder="Digite o nome do participante ou grupo" {...register('name')} /></Field>
         <Field label="Nome da fantasia" error={errors.costumeName?.message}><input className="input" {...register('costumeName')} /></Field>
         <PhotoUpload file={photo} onChange={setPhoto} />
         <Field label="Descrição" error={errors.description?.message}><textarea className="input min-h-28 resize-y" {...register('description')} /></Field>
