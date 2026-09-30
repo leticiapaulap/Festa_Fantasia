@@ -17,6 +17,7 @@ public class AuthDtos {
     public record CreateAdminRequest(
             @NotBlank @Size(max = 120) String name,
             @Email @NotBlank @Size(max = 160) String email,
-            @NotBlank @Size(min = 8, message = "A senha deve ter pelo menos 8 caracteres.") String password
+            @NotBlank @Size(min = 8, message = "A senha deve ter pelo menos 8 caracteres.") String password,
+            @NotBlank(message = "Informe o código de autorização.") String authorizationCode
     ) {}
 }

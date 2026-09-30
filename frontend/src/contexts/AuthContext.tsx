@@ -5,7 +5,7 @@ import type { LoginResponse } from '../types/api';
 type AuthContextValue = {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  bootstrap: (name: string, email: string, password: string) => Promise<void>;
+  bootstrap: (name: string, email: string, password: string, authorizationCode: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -20,8 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
   }
 
-  async function bootstrap(name: string, email: string, password: string) {
-    const { data } = await api.post<LoginResponse>('/admin/bootstrap', { name, email, password });
+  async function bootstrap(name: string, email: string, password: string, authorizationCode: string) {
+    const { data } = await api.post<LoginResponse>('/admin/bootstrap', { name, email, password, authorizationCode });
     localStorage.setItem('adminToken', data.token);
     setToken(data.token);
   }

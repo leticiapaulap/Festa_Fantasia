@@ -28,5 +28,5 @@ app:
   storage:
     cloudinary-cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     cloudinary-upload-preset: ${CLOUDINARY_UPLOAD_PRESET:}
-  registration:
-    access-code: ${REGISTRATION_ACCESS_CODE:}
+  admin:
+    registration-code: ${ADMIN_REGISTRATION_CODE:}

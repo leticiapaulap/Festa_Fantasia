@@ -28,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/resultado" element={<ResultPage />} />
           </Route>
           <Route path="/admin" element={<AdminLoginPage />} />
+          <Route path="/admin/register" element={<AdminLoginPage />} />
           <Route path="/admin/painel" element={<AdminLayout><AdminDashboardPage /></AdminLayout>} />
           <Route path="/admin/qr" element={<AdminQrPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

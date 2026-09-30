@@ -101,11 +101,10 @@ export function HomePage() {
         {phase === 'REGISTRATION' && (
           <QrPanel
             title="CADASTRO"
-            description="Escaneie para acessar o cadastro."
+            description="Escaneie o QR Code para cadastrar sua fantasia."
             value={registrationUrl}
             footerTitle="Votação"
             footerText="Aguardando o dia do evento."
-            note="É necessário possuir o código fornecido pela organização."
             action={<Link className="btn-primary md:hidden" to="/cadastro">Cadastrar minha fantasia</Link>}
             extra={<button className="btn-secondary md:hidden" type="button" onClick={copyRegistration}><Share2 className="h-4 w-4" /> Copiar link</button>}
           />

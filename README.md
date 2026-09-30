@@ -37,7 +37,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 MAX_PHOTO_SIZE_MB=5
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_UPLOAD_PRESET=
-REGISTRATION_ACCESS_CODE=
+ADMIN_REGISTRATION_CODE=
 ```
 
 Frontend (`frontend/.env.example`):
@@ -84,7 +84,7 @@ npm run dev
 
 ## Criar Administrador
 
-Na tela `/admin`, crie o administrador inicial. A API só permite o bootstrap quando ainda não existe nenhum administrador.
+Na tela `/admin`, use o link para criar o administrador inicial. A API só permite o bootstrap quando ainda não existe nenhum administrador e exige `ADMIN_REGISTRATION_CODE` no backend.
 
 Depois disso, use login normal com e-mail e senha. As senhas são armazenadas com BCrypt, nunca em texto puro.
 
@@ -106,7 +106,7 @@ Backend:
 - Configure PostgreSQL gerenciado.
 - Defina `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET` e `CORS_ALLOWED_ORIGINS`.
 - Defina `CLOUDINARY_CLOUD_NAME` e `CLOUDINARY_UPLOAD_PRESET` para persistir fotos em produção.
-- Defina `REGISTRATION_ACCESS_CODE` somente no backend. Não use `VITE_` para esse código.
+- Defina `ADMIN_REGISTRATION_CODE` somente no backend para autorizar a criação do administrador inicial. Não use `VITE_` para esse código.
 - Para Neon, use a URL JDBC no backend, por exemplo `jdbc:postgresql://HOST/neondb?sslmode=require`, junto com `DATABASE_USERNAME` e `DATABASE_PASSWORD`.
 - Configure `CORS_ALLOWED_ORIGINS` com a URL da Vercel, por exemplo `https://seu-projeto.vercel.app`.
 
