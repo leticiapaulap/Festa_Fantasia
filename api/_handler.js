@@ -116,7 +116,7 @@ module.exports = async function handler(req, res) {
     const parts = path.split('/').filter(Boolean);
 
     if (req.method === 'GET' && path === 'settings') return json(res, await getSettings());
-    if (req.method === 'PUT' && path === 'admin/settings') return withAdmin(req, res, async () => json(res, await updateSettings(await readJson(req))));
+    if (req.method === 'PUT' && path === 'admin/settings') return await withAdmin(req, res, async () => json(res, await updateSettings(await readJson(req))));
     if (req.method === 'GET' && path === 'participants') return json(res, await listParticipants(true));
     if (req.method === 'GET' && parts[0] === 'participants' && parts[1]) return json(res, await getParticipant(parts[1]));
     if (req.method === 'POST' && path === 'participants') return json(res, await createPublicParticipant(req), 201);
@@ -129,7 +129,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && path === 'admin/login') return json(res, await login(await readJson(req)));
 
     if (path.startsWith('admin/')) {
-      return withAdmin(req, res, async () => {
+      return await withAdmin(req, res, async () => {
         if (req.method === 'GET' && path === 'admin/dashboard') return json(res, await dashboard());
         if (req.method === 'GET' && path === 'admin/participants') return json(res, await listParticipants(false));
         if (req.method === 'POST' && path === 'admin/participants') return json(res, await createAdminParticipant(req), 201);
