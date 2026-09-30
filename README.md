@@ -113,14 +113,20 @@ Backend:
 Frontend:
 
 - Vercel.
-- Como o frontend da Vercel e o backend Spring podem estar separados, defina `VITE_API_URL` apontando para a URL pública do backend, nunca para a URL da página Vercel do frontend. A aplicação normaliza a base para usar os endpoints `/api`. Não coloque segredos em variáveis `VITE_*`.
-- Se o projeto Vercel estiver apontando para a raiz do repositório, o `vercel.json` já manda instalar e buildar dentro de `frontend/`.
-- Neon hospeda apenas o PostgreSQL. O frontend da Vercel ainda precisa de uma API Java publicada em Railway, Render ou serviço equivalente.
+- Se o frontend e a API forem publicados juntos, `VITE_API_URL` pode ficar vazio: as chamadas de produção usam `/api` no mesmo domínio. Em desenvolvimento, deixe a variável vazia para usar o backend local em `http://localhost:8080/api`, ou defina-a para apontar a outro backend. Nunca coloque segredos em variáveis `VITE_*`.
+- Se o projeto Vercel estiver apontando para a raiz do repositório, o `vercel.json` instala e compila o frontend dentro de `frontend/`, mantendo as rotas da SPA em `index.html`.
+
+API serverless da Vercel:
+
+- `api/[...path].js` é o único arquivo de endpoint dentro de `api/` e encaminha as rotas para `server/api-handler.js`. Os módulos compartilhados ficam fora da pasta que a Vercel trata como Functions.
+- Os caminhos existentes (`/api/settings`, `/api/participants`, `/api/admin/*`, `/api/votes` e `/api/results`) continuam disponíveis pela mesma Function. Isso mantém o deployment dentro do limite do plano Hobby.
+- Configure `DATABASE_URL` e `ADMIN_REGISTRATION_CODE` nas variáveis server-side da Vercel. O backend usa `pg` e PostgreSQL (incluindo Neon); não usa Prisma. `VITE_API_URL` não é necessária para chamadas same-origin.
+- `POST /api/admin/register` exige `ADMIN_REGISTRATION_CODE` e permite registrar outra conta; `POST /api/admin/login` requer somente e-mail e senha. O endpoint legado `/api/admin/bootstrap` continua restrito à criação inicial.
 
 Banco:
 
 - Neon, Supabase ou Railway.
-- Não use banco efêmero em produção.
+- Configure `DATABASE_URL` para a API serverless, com SSL quando exigido pelo provedor. Não use banco efêmero em produção.
 
 ## Upload de Fotos
 

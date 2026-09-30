@@ -1,1 +1,1 @@
-module.exports = require('./_handler.js');
+module.exports = require('../server/api-handler.js');

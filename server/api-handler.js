@@ -116,7 +116,7 @@ module.exports = async function handler(req, res) {
     const parts = path.split('/').filter(Boolean);
 
     if (req.method === 'GET' && path === 'settings') return json(res, await getSettings());
-    if (req.method === 'PUT' && path === 'admin/settings') return await withAdmin(req, res, async () => json(res, await updateSettings(await readJson(req))));
+    if ((req.method === 'PUT' || req.method === 'PATCH') && path === 'admin/settings') return await withAdmin(req, res, async () => json(res, await updateSettings(await readJson(req))));
     if (req.method === 'GET' && path === 'participants') return json(res, await listParticipants(true));
     if (req.method === 'GET' && parts[0] === 'participants' && parts[1]) return json(res, await getParticipant(parts[1]));
     if (req.method === 'POST' && path === 'participants') return json(res, await createPublicParticipant(req), 201);
@@ -126,7 +126,9 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET' && path === 'admin/bootstrap/status') return json(res, await bootstrapStatus());
     if (req.method === 'POST' && path === 'admin/bootstrap') return json(res, await bootstrap(await readJson(req)));
+    if (req.method === 'POST' && path === 'admin/register') return json(res, await registerAdmin(await readJson(req)), 201);
     if (req.method === 'POST' && path === 'admin/login') return json(res, await login(await readJson(req)));
+    if (req.method === 'POST' && path === 'admin/logout') return json(res, { message: 'Sessão encerrada.' });
 
     if (path.startsWith('admin/')) {
       return await withAdmin(req, res, async () => {
@@ -230,6 +232,8 @@ function settingsResponse(row) {
     resultsPublic: !!row.results_public,
     votingStatus: row.voting_status || (row.voting_open ? 'OPEN' : 'DRAFT'),
     showPublicResults: !!row.show_public_results,
+    votingStartsAt: votingStart ? votingStart.toISOString() : null,
+    votingEndsAt: votingEnd ? votingEnd.toISOString() : null,
     votingStart: votingStart ? votingStart.toISOString() : null,
     votingEnd: votingEnd ? votingEnd.toISOString() : null,
     canAcceptVotes: canAcceptVotes(row),
@@ -507,16 +511,33 @@ async function bootstrapStatus() {
 }
 
 async function bootstrap(input) {
-  const email = normalizeEmail(input.email);
-  validateAdminCode(input.authorizationCode);
-  if (!email) throw httpError(400, 'Informe um e-mail válido.');
-  if (!input.password || input.password.length < 8) throw httpError(400, 'A senha deve ter pelo menos 8 caracteres.');
+  const email = validateAdminRegistration(input);
   if ((await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [email])) > 0) {
     throw httpError(409, 'Já existe uma conta com este e-mail.');
   }
   if ((await scalar('SELECT COUNT(*)::int AS total FROM admin_users')) > 0) {
     throw httpError(409, 'Administrador inicial ja foi criado.');
   }
+  return createAdmin(input, email);
+}
+
+async function registerAdmin(input) {
+  const email = validateAdminRegistration(input);
+  if ((await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [email])) > 0) {
+    throw httpError(409, 'Já existe uma conta com este e-mail.');
+  }
+  return createAdmin(input, email);
+}
+
+function validateAdminRegistration(input) {
+  const email = normalizeEmail(input.email);
+  validateAdminCode(input.authorizationCode);
+  if (!email) throw httpError(400, 'Informe um e-mail válido.');
+  if (!input.password || input.password.length < 8) throw httpError(400, 'A senha deve ter pelo menos 8 caracteres.');
+  return email;
+}
+
+async function createAdmin(input, email) {
   const hash = await bcrypt.hash(input.password, 12);
   const { rows } = await getPool().query(
     'INSERT INTO admin_users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
