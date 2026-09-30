@@ -11,6 +11,7 @@ export const api = axios.create({
 
 function normalizeApiBaseUrl(value?: string) {
   if (!value) return import.meta.env.DEV ? 'http://localhost:8080/api' : '/api';
+  if (typeof window !== 'undefined' && value === window.location.origin) return '/api';
   return value.endsWith('/api') ? value : `${value}/api`;
 }
 
