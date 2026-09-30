@@ -1,0 +1,126 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { getPool, scalar } = require('./database');
+const { results } = require('./results');
+const { getSettings } = require('./settings');
+const { clean, httpError, normalizeCode, normalizeEmail } = require('./http');
+
+async function dashboard() {
+  const settings = await getSettings();
+  const eventResults = await results(false);
+  const [participants, votes, availableCodes, usedCodes] = await Promise.all([
+    scalar('SELECT COUNT(*)::int AS total FROM participants'),
+    scalar('SELECT COUNT(*)::int AS total FROM votes'),
+    scalar('SELECT COUNT(*)::int AS total FROM vote_codes WHERE used=FALSE'),
+    scalar('SELECT COUNT(*)::int AS total FROM vote_codes WHERE used=TRUE'),
+  ]);
+  return {
+    participants,
+    votes,
+    availableCodes,
+    usedCodes,
+    status: settings.canAcceptVotes ? 'VOTAÇÃO ABERTA' : settings.votingAvailability,
+    settings,
+    results: eventResults,
+  };
+}
+
+async function resetVotes(input) {
+  if (input.confirmation !== 'RESETAR VOTOS') throw httpError(400, 'Confirmação inválida.');
+  await getPool().query('DELETE FROM votes; UPDATE vote_codes SET used=FALSE, used_at=NULL;');
+  return {};
+}
+
+async function bootstrapStatus() {
+  return { available: (await scalar('SELECT COUNT(*)::int AS total FROM admin_users')) === 0 };
+}
+
+async function bootstrap(input) {
+  const email = validateAdminRegistration(input);
+  if ((await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [email])) > 0) {
+    throw httpError(409, 'Já existe uma conta com este e-mail.');
+  }
+  if ((await scalar('SELECT COUNT(*)::int AS total FROM admin_users')) > 0) {
+    throw httpError(409, 'Administrador inicial ja foi criado.');
+  }
+  return createAdmin(input, email);
+}
+
+async function registerAdmin(input) {
+  const email = validateAdminRegistration(input);
+  if ((await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [email])) > 0) {
+    throw httpError(409, 'Já existe uma conta com este e-mail.');
+  }
+  return createAdmin(input, email);
+}
+
+function validateAdminRegistration(input) {
+  const email = normalizeEmail(input.email);
+  validateAdminCode(input.authorizationCode);
+  if (!email) throw httpError(400, 'Informe um e-mail válido.');
+  if (!input.password || input.password.length < 8) throw httpError(400, 'A senha deve ter pelo menos 8 caracteres.');
+  return email;
+}
+
+async function createAdmin(input, email) {
+  const hash = await bcrypt.hash(input.password, 12);
+  const { rows } = await getPool().query(
+    'INSERT INTO admin_users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
+    [clean(input.name) || 'Administrador', email, hash]
+  );
+  return loginResponse(rows[0]);
+}
+
+async function login(input) {
+  const email = normalizeEmail(input.email);
+  const { rows } = await getPool().query('SELECT * FROM admin_users WHERE LOWER(email)=LOWER($1)', [email]);
+  const admin = rows[0];
+  if (!admin || !(await bcrypt.compare(input.password || '', admin.password_hash))) {
+    throw httpError(401, 'E-mail ou senha inválidos.');
+  }
+  return loginResponse(admin);
+}
+
+function validateAdminCode(code) {
+  const expected = normalizeCode(process.env.ADMIN_REGISTRATION_CODE || '');
+  if (!expected || normalizeCode(code) !== expected) throw httpError(403, 'Código de autorização inválido.');
+}
+
+function loginResponse(admin) {
+  return {
+    token: jwt.sign({ sub: admin.email, name: admin.name }, jwtSecret(), { expiresIn: '8h' }),
+    name: admin.name,
+    email: admin.email,
+  };
+}
+
+async function withAdmin(req, action) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) throw httpError(401, 'Autenticação administrativa necessária.');
+  try {
+    const payload = jwt.verify(token, jwtSecret());
+    const count = await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [payload.sub]);
+    if (count < 1) throw httpError(401, 'Autenticação administrativa inválida.');
+    return await action();
+  } catch (error) {
+    if (error.status) throw error;
+    throw httpError(401, 'Autenticação administrativa inválida.');
+  }
+}
+
+function jwtSecret() {
+  const secret = process.env.JWT_SECRET || 'dev-secret-change-this-value-with-at-least-32-characters';
+  if (secret.length < 32) throw httpError(500, 'JWT_SECRET precisa ter pelo menos 32 caracteres.');
+  return secret;
+}
+
+module.exports = {
+  bootstrap,
+  bootstrapStatus,
+  dashboard,
+  login,
+  registerAdmin,
+  resetVotes,
+  withAdmin,
+};

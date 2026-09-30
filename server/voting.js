@@ -1,0 +1,74 @@
+const { getPool } = require('./database');
+const { availability, canAcceptVotes } = require('./settings');
+const { cryptoRandom, httpError, iso, normalizeCode } = require('./http');
+
+async function vote(input) {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const settings = (await client.query('SELECT * FROM event_settings WHERE id=1')).rows[0];
+    if (!canAcceptVotes(settings)) throw httpError(409, messageForVoting(settings));
+    const code = normalizeCode(input.code);
+    const codeResult = await client.query('SELECT * FROM vote_codes WHERE code=$1 FOR UPDATE', [code]);
+    const voteCode = codeResult.rows[0];
+    if (!voteCode) throw httpError(404, 'Código de votação inválido.');
+    if (voteCode.used) throw httpError(409, 'Este código já foi utilizado.');
+    const participant = await client.query('SELECT * FROM participants WHERE id=$1 AND active=TRUE', [input.participantId]);
+    if (!participant.rows[0]) throw httpError(404, 'Participante não encontrado.');
+    await client.query('INSERT INTO votes (participant_id, vote_code_id) VALUES ($1, $2)', [input.participantId, voteCode.id]);
+    await client.query('UPDATE vote_codes SET used=TRUE, used_at=NOW() WHERE id=$1', [voteCode.id]);
+    await client.query('COMMIT');
+    return { message: 'Voto registrado com sucesso!' };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function messageForVoting(settings) {
+  const state = availability(settings);
+  if (state === 'BEFORE_WINDOW') return 'A votação será liberada no horário do evento.';
+  if (state === 'AFTER_WINDOW' || state === 'CLOSED') return 'A votação está encerrada.';
+  return 'A votação ainda não está aberta.';
+}
+
+async function validateCode(input) {
+  const code = normalizeCode(input.code);
+  const { rows } = await getPool().query('SELECT * FROM vote_codes WHERE code=$1', [code]);
+  if (!rows[0]) return { valid: false, used: false, message: 'Código inválido.' };
+  return { valid: !rows[0].used, used: !!rows[0].used, message: rows[0].used ? 'Código já utilizado.' : 'Código válido.' };
+}
+
+async function voteCodes() {
+  const { rows } = await getPool().query('SELECT * FROM vote_codes ORDER BY created_at DESC');
+  return rows.map(voteCodeResponse);
+}
+
+async function generateCodes(input) {
+  const quantity = Math.max(1, Math.min(Number(input.quantity || 1), 500));
+  const codes = [];
+  while (codes.length < quantity) {
+    const code = `FESTA-${cryptoRandom().slice(0, 5).toUpperCase()}`;
+    try {
+      const { rows } = await getPool().query('INSERT INTO vote_codes (code) VALUES ($1) RETURNING *', [code]);
+      codes.push(voteCodeResponse(rows[0]));
+    } catch (error) {
+      if (error.code !== '23505') throw error;
+    }
+  }
+  return { codes };
+}
+
+function voteCodeResponse(row) {
+  return {
+    id: Number(row.id),
+    code: row.code,
+    used: !!row.used,
+    createdAt: iso(row.created_at),
+    usedAt: iso(row.used_at),
+  };
+}
+
+module.exports = { generateCodes, validateCode, vote, voteCodes };

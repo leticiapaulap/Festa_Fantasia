@@ -118,7 +118,7 @@ Frontend:
 
 API serverless da Vercel:
 
-- `api/[...path].js` é o único arquivo de endpoint dentro de `api/` e encaminha as rotas para `server/api-handler.js`. Os módulos compartilhados ficam fora da pasta que a Vercel trata como Functions.
+- `api/[...path].js` é o único arquivo de endpoint dentro de `api/` e encaminha as rotas para `server/api-handler.js`. O roteador delega para módulos server-side separados: `database.js`, `http.js`, `settings.js`, `participants.js`, `voting.js`, `results.js` e `admin.js`. Eles ficam fora da pasta que a Vercel trata como Functions.
 - Os caminhos existentes (`/api/settings`, `/api/participants`, `/api/admin/*`, `/api/votes` e `/api/results`) continuam disponíveis pela mesma Function. Isso mantém o deployment dentro do limite do plano Hobby.
 - Configure `DATABASE_URL` e `ADMIN_REGISTRATION_CODE` nas variáveis server-side da Vercel. O backend usa `pg` e PostgreSQL (incluindo Neon); não usa Prisma. `VITE_API_URL` não é necessária para chamadas same-origin.
 - `POST /api/admin/register` exige `ADMIN_REGISTRATION_CODE` e permite registrar outra conta; `POST /api/admin/login` requer somente e-mail e senha. O endpoint legado `/api/admin/bootstrap` continua restrito à criação inicial.
