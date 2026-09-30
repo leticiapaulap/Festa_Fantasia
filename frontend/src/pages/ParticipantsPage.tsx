@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BackHomeLink } from '../components/BackHomeLink';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { SkeletonGrid } from '../components/SkeletonGrid';
-import { api, apiMessage } from '../services/api';
+import { api, apiMessage, ensureParticipants } from '../services/api';
 import type { Participant } from '../types/api';
 
 export function ParticipantsPage() {
@@ -15,8 +15,7 @@ export function ParticipantsPage() {
   useEffect(() => {
     api.get<Participant[]>('/participants')
       .then(({ data }) => {
-        if (!Array.isArray(data)) throw new Error('INVALID_PARTICIPANTS_RESPONSE');
-        setParticipants(data);
+        setParticipants(ensureParticipants(data));
       })
       .catch((err) => setError(apiMessage(err)))
       .finally(() => setLoading(false));
@@ -43,7 +42,8 @@ export function ParticipantsPage() {
       </div>
       {loading && <SkeletonGrid />}
       {error && <div className="card text-orange-100">{error}</div>}
-      {!loading && !error && filtered.length === 0 && <div className="card text-white/70">Nenhuma fantasia encontrada.</div>}
+      {!loading && !error && participants.length === 0 && <div className="card text-white/70">Ainda não há participantes cadastrados.</div>}
+      {!loading && !error && participants.length > 0 && filtered.length === 0 && <div className="card text-white/70">Nenhuma fantasia encontrada.</div>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((participant) => <ParticipantCard key={participant.id} participant={participant} />)}
       </div>

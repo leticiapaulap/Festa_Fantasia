@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { CalendarClock, LockKeyhole, QrCode, Share2, Trophy, Users, Vote } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, apiMessage } from '../services/api';
+import { api, apiMessage, ensureSettings } from '../services/api';
 import { eventPhase, formatEventDate } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
 import type { EventSettings } from '../types/api';
@@ -14,8 +14,7 @@ export function HomePage() {
   useEffect(() => {
     api.get<EventSettings>('/settings')
       .then(({ data }) => {
-        if (typeof data?.registrationOpen !== 'boolean') throw new Error('INVALID_SETTINGS_RESPONSE');
-        setSettings(data);
+        setSettings(ensureSettings(data));
       })
       .catch((error) => setSettingsError(apiMessage(error)));
   }, []);

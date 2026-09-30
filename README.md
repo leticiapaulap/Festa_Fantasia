@@ -113,7 +113,7 @@ Backend:
 Frontend:
 
 - Vercel.
-- Como o frontend da Vercel e o backend Spring podem estar separados, defina `VITE_API_URL` apontando para a URL pública do backend com `/api` quando a API não estiver no mesmo domínio. Não coloque segredos em variáveis `VITE_*`.
+- Como o frontend da Vercel e o backend Spring podem estar separados, defina `VITE_API_URL` apontando para a URL pública do backend, nunca para a URL da página Vercel do frontend. A aplicação normaliza a base para usar os endpoints `/api`. Não coloque segredos em variáveis `VITE_*`.
 - Se o projeto Vercel estiver apontando para a raiz do repositório, o `vercel.json` já manda instalar e buildar dentro de `frontend/`.
 - Neon hospeda apenas o PostgreSQL. O frontend da Vercel ainda precisa de uma API Java publicada em Railway, Render ou serviço equivalente.
 

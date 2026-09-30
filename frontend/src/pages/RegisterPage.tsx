@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { BackHomeLink } from '../components/BackHomeLink';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { PhotoUpload } from '../components/PhotoUpload';
-import { api, apiMessage } from '../services/api';
+import { api, apiMessage, ensureSettings } from '../services/api';
 import type { EventSettings, Participant } from '../types/api';
 
 const schema = z.object({
@@ -23,10 +23,15 @@ export function RegisterPage() {
   const [created, setCreated] = useState<Participant | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [settings, setSettings] = useState<EventSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState('');
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
-    api.get<EventSettings>('/settings').then(({ data }) => setSettings(data)).catch(() => undefined);
+    api.get<EventSettings>('/settings')
+      .then(({ data }) => setSettings(ensureSettings(data)))
+      .catch((error) => setSettingsError(apiMessage(error)))
+      .finally(() => setSettingsLoading(false));
   }, []);
 
   async function onSubmit(values: FormData) {
@@ -50,7 +55,25 @@ export function RegisterPage() {
     }
   }
 
-  if (settings && !settings.registrationOpen) {
+  if (settingsLoading) {
+    return (
+      <section className="mx-auto grid max-w-3xl gap-6 py-6">
+        <BackHomeLink />
+        <div className="card text-center text-white/70">Carregando informações do cadastro...</div>
+      </section>
+    );
+  }
+
+  if (settingsError) {
+    return (
+      <section className="mx-auto grid max-w-3xl gap-6 py-6">
+        <BackHomeLink />
+        <div className="card text-center text-orange-100">{settingsError}</div>
+      </section>
+    );
+  }
+
+  if (settings?.registrationOpen === false) {
     return (
       <section className="mx-auto grid max-w-3xl gap-6 py-6">
         <BackHomeLink />
