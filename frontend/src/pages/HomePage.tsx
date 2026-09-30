@@ -1,29 +1,19 @@
 import { Link } from 'react-router-dom';
 import { CalendarClock, LockKeyhole, QrCode, Share2, Trophy, Users, Vote } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, apiMessage, ensureSettings } from '../services/api';
+import { useMemo, type ReactNode } from 'react';
 import { eventPhase, formatEventDate } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
-import type { EventSettings } from '../types/api';
+import { useEventSettings } from '../services/useEventSettings';
 
 export function HomePage() {
-  const [settings, setSettings] = useState<EventSettings | null>(null);
-  const [settingsError, setSettingsError] = useState('');
+  const { settings, loading: settingsLoading, error: settingsError } = useEventSettings();
 
-  useEffect(() => {
-    api.get<EventSettings>('/settings')
-      .then(({ data }) => {
-        setSettings(ensureSettings(data));
-      })
-      .catch((error) => setSettingsError(apiMessage(error)));
-  }, []);
-
-  const phase = eventPhase(settings);
+  const phase = settings ? eventPhase(settings) : null;
   const eventDate = formatEventDate(settings);
   const registrationUrl = publicRegistrationUrl();
   const voteUrl = publicVotingUrl();
-  const steps = useMemo(() => phase === 'VOTING'
+  const steps = useMemo(() => !phase ? [] : phase === 'VOTING'
     ? ['Escolha sua fantasia favorita', 'Confirme seu voto', 'Aguarde o resultado final']
     : ['Cadastre sua fantasia', 'Envie sua foto', 'Aguarde o dia da votação'], [phase]);
 
@@ -39,7 +29,12 @@ export function HomePage() {
         {eventDate && <p className="mt-3 text-sm font-semibold uppercase text-white/55">{eventDate}</p>}
         {settingsError && (
           <p className="mt-3 max-w-2xl rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-100">
-            Não foi possível confirmar as configurações agora. O cadastro continua disponível; se a listagem não carregar, verifique a URL pública da API.
+            Não foi possível carregar as informações do evento.
+          </p>
+        )}
+        {settingsLoading && (
+          <p className="mt-3 max-w-2xl rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/70">
+            Carregando informações do evento...
           </p>
         )}
 
@@ -86,17 +81,22 @@ export function HomePage() {
           </>
         )}
 
-        <div className="mt-8 grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4 sm:grid-cols-3">
-          {steps.map((item) => (
-            <div key={item} className="flex items-center gap-3 text-sm text-white/70">
-              <CalendarClock className="h-5 w-5 shrink-0 text-ember" />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
+        {steps.length > 0 && (
+          <div className="mt-8 grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4 sm:grid-cols-3">
+            {steps.map((item) => (
+              <div key={item} className="flex items-center gap-3 text-sm text-white/70">
+                <CalendarClock className="h-5 w-5 shrink-0 text-ember" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <aside className="card">
+        {!phase && (
+          <StatusPanel title="Halloween" text={settingsLoading ? 'Carregando informações do evento...' : 'Não foi possível carregar as informações do evento.'} />
+        )}
         {phase === 'REGISTRATION' && (
           <QrPanel
             title="CADASTRO"

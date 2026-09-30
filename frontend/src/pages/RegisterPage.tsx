@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Camera, CheckCircle2, Users } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -8,8 +8,9 @@ import { z } from 'zod';
 import { BackHomeLink } from '../components/BackHomeLink';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { PhotoUpload } from '../components/PhotoUpload';
-import { api, apiMessage, ensureSettings } from '../services/api';
-import type { EventSettings, Participant } from '../types/api';
+import { api, apiMessage } from '../services/api';
+import { useEventSettings } from '../services/useEventSettings';
+import type { Participant } from '../types/api';
 
 const schema = z.object({
   name: z.string().min(2, 'Informe seu nome.'),
@@ -22,17 +23,8 @@ type FormData = z.infer<typeof schema>;
 export function RegisterPage() {
   const [created, setCreated] = useState<Participant | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
-  const [settings, setSettings] = useState<EventSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(true);
-  const [settingsError, setSettingsError] = useState('');
+  const { settings, loading: settingsLoading, error: settingsError } = useEventSettings();
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormData>({ resolver: zodResolver(schema) });
-
-  useEffect(() => {
-    api.get<EventSettings>('/settings')
-      .then(({ data }) => setSettings(ensureSettings(data)))
-      .catch((error) => setSettingsError(apiMessage(error)))
-      .finally(() => setSettingsLoading(false));
-  }, []);
 
   async function onSubmit(values: FormData) {
     if (!photo) {
