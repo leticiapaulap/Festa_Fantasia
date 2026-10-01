@@ -6,7 +6,7 @@ function readJson(req) {
       try {
         resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') : {});
       } catch (error) {
-        reject(error);
+        reject(httpError(400, 'JSON inválido.'));
       }
     });
     req.on('error', reject);

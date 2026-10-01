@@ -3,15 +3,24 @@ const { votingState } = require('./settings');
 const { cryptoRandom, httpError, iso, normalizeCode } = require('./http');
 
 async function vote(input) {
+  const participantId = Number(input?.participantId);
+  if (!Number.isInteger(participantId) || participantId <= 0) {
+    throw httpError(400, 'Participante inválido.');
+  }
+
+  const code = normalizeCode(input?.code);
+  if (!code) {
+    throw httpError(400, 'Informe o código de votação.');
+  }
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
     const settings = (await client.query('SELECT * FROM event_settings WHERE id=1')).rows[0];
     const state = votingState(settings);
-    if (!['TEST', 'OPEN'].includes(state)) throw httpError(409, messageForVoting(state));
+    if (!['TEST', 'OPEN'].includes(state)) throw httpError(403, messageForVoting(state));
 
     const isTestVote = state === 'TEST';
-    const code = normalizeCode(input.code);
     const codeResult = await client.query('SELECT * FROM vote_codes WHERE code=$1 FOR UPDATE', [code]);
     const voteCode = codeResult.rows[0];
     if (!voteCode) throw httpError(404, 'Código de votação inválido.');
@@ -25,11 +34,11 @@ async function vote(input) {
       throw httpError(409, isTestVote ? 'Este código já foi utilizado no teste.' : 'Este código já foi utilizado.');
     }
 
-    const participant = await client.query('SELECT * FROM participants WHERE id=$1 AND active=TRUE', [input.participantId]);
+    const participant = await client.query('SELECT * FROM participants WHERE id=$1 AND active=TRUE', [participantId]);
     if (!participant.rows[0]) throw httpError(404, 'Participante não encontrado.');
     await client.query(
       'INSERT INTO votes (participant_id, vote_code_id, is_test_vote) VALUES ($1, $2, $3)',
-      [input.participantId, voteCode.id, isTestVote]
+      [participantId, voteCode.id, isTestVote]
     );
     if (!isTestVote) {
       await client.query('UPDATE vote_codes SET used=TRUE, used_at=NOW() WHERE id=$1', [voteCode.id]);
