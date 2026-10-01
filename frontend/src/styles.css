@@ -71,3 +71,65 @@ button, input, textarea, select {
   color: #f6edf8 !important;
   border: 1px solid rgba(255,255,255,0.12) !important;
 }
+
+.admin-dashboard .card {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(18, 14, 24, 0.82);
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+.admin-dashboard .btn-primary {
+  box-shadow: none;
+}
+
+.btn-danger {
+  @apply btn border border-rose-300/25 bg-rose-400/10 text-rose-100 hover:bg-rose-400/15;
+}
+
+.metric-card {
+  background: rgba(18, 14, 24, 0.84);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.metric-success {
+  border-color: rgba(110, 231, 183, 0.2);
+}
+
+.metric-warning {
+  border-color: rgba(252, 211, 77, 0.2);
+}
+
+.action-card {
+  @apply flex min-w-0 flex-col justify-between gap-4 rounded-xl border border-white/10 bg-black/25 p-4 sm:p-5;
+  min-height: 150px;
+}
+
+.test-mode-notice {
+  border-color: rgba(252, 211, 77, 0.22);
+  background: rgba(252, 211, 77, 0.07);
+}
+
+.status-dot {
+  @apply inline-block h-2 w-2 shrink-0 rounded-full;
+}
+
+.admin-tab {
+  @apply inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-4 text-sm font-semibold text-white/65 transition hover:bg-white/5 hover:text-white;
+}
+
+.admin-tab-active {
+  @apply border-ember/25 bg-ember/10 text-orange-100;
+}
+
+@media (max-width: 639px) {
+  .admin-dashboard .card {
+    padding: 16px;
+  }
+
+  .admin-header {
+    padding: 16px;
+  }
+}

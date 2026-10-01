@@ -1,7 +1,30 @@
-import { Copy, Download, Edit3, ExternalLink, Monitor, Plus, Trash2 } from 'lucide-react';
+import {
+  Activity,
+  CalendarClock,
+  CheckCircle2,
+  Copy,
+  Download,
+  Edit3,
+  ExternalLink,
+  FlaskConical,
+  KeyRound,
+  LayoutDashboard,
+  Monitor,
+  Plus,
+  QrCode,
+  Settings,
+  Ticket,
+  Trash2,
+  Trophy,
+  Users,
+  Vote,
+  XCircle,
+} from 'lucide-react';
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
+import { type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { AdminHeader } from '../components/AdminHeader';
 import { Modal } from '../components/Modal';
 import { ParticipantCard } from '../components/ParticipantCard';
 import { PhotoUpload } from '../components/PhotoUpload';
@@ -21,6 +44,7 @@ export function AdminDashboardPage() {
   const [settings, setSettings] = useState<EventSettings | null>(null);
   const [editing, setEditing] = useState<Participant | null>(null);
   const [creating, setCreating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
     const [dash, res, people, voteCodes, eventSettings] = await Promise.all([
@@ -35,10 +59,14 @@ export function AdminDashboardPage() {
     setParticipants(people.data);
     setCodes(voteCodes.data);
     setSettings(eventSettings.data);
+    setIsLoading(false);
   }
 
   useEffect(() => {
-    load().catch((error) => toast.error(apiMessage(error)));
+    load().catch((error) => {
+      setIsLoading(false);
+      toast.error(apiMessage(error));
+    });
     const id = window.setInterval(() => load().catch(() => undefined), 7000);
     return () => window.clearInterval(id);
   }, []);
@@ -102,9 +130,13 @@ export function AdminDashboardPage() {
   }
 
   async function saveSettings(next: EventSettings) {
+    await persistSettings(next, 'Configurações salvas.');
+  }
+
+  async function persistSettings(next: EventSettings, successMessage: string) {
     try {
       await api.put('/admin/settings', next);
-      toast.success('Configurações salvas.');
+      toast.success(successMessage);
       await load();
     } catch (error) {
       toast.error(apiMessage(error));
@@ -122,6 +154,20 @@ export function AdminDashboardPage() {
     }
   }
 
+  async function toggleRegistration(open: boolean) {
+    if (!settings) return;
+    if (!open && !window.confirm('Deseja realmente encerrar os cadastros?')) return;
+    await persistSettings({ ...settings, registrationOpen: open }, open ? 'Cadastros abertos.' : 'Cadastros encerrados.');
+  }
+
+  async function toggleTestMode(enabled: boolean) {
+    if (!settings) return;
+    await persistSettings(
+      { ...settings, votingTestMode: enabled, showLiveResults: true },
+      enabled ? 'Modo de teste ativado.' : 'Modo de teste desativado.',
+    );
+  }
+
   function downloadQr(id: string, filename: string) {
     const canvas = document.getElementById(id) as HTMLCanvasElement | null;
     if (!canvas) return;
@@ -132,57 +178,96 @@ export function AdminDashboardPage() {
   }
 
   return (
-    <section className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <Metric label="Participantes" value={dashboard?.participants ?? 0} />
-        <Metric label="Votos oficiais" value={dashboard?.votes ?? 0} />
-        <Metric label="Votos teste" value={dashboard?.testVotes ?? 0} />
-        <Metric label="Códigos disponíveis" value={dashboard?.availableCodes ?? 0} />
-        <Metric label="Códigos utilizados" value={dashboard?.usedCodes ?? 0} />
-        <Metric label="Status" value={dashboard?.status ?? '...'} />
-      </div>
-      {settings?.votingTestMode && (
-        <div className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-bold uppercase text-amber-100">
-          MODO DE TESTE ATIVO
+    <section className="admin-dashboard grid min-w-0 gap-6">
+      <AdminHeader testMode={settings?.votingTestMode ?? false} />
+      {isLoading ? <DashboardSkeleton /> : dashboard && settings ? (
+        <>
+          <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <Metric icon={Users} label="Participantes" value={dashboard.participants} caption="cadastrados" />
+            <Metric icon={Vote} label="Votos oficiais" value={dashboard.votes} caption="votos contabilizados" />
+            <Metric icon={FlaskConical} label="Votos de teste" value={dashboard.testVotes} caption="fora do resultado oficial" tone="warning" />
+            <Metric icon={Ticket} label="Códigos disponíveis" value={dashboard.availableCodes} caption="prontos para uso" />
+            <Metric icon={KeyRound} label="Códigos utilizados" value={dashboard.usedCodes} caption="já utilizados" />
+            <Metric
+              icon={Activity}
+              label="Status da votação"
+              value={votingStatusLabel(settings)}
+              caption={settings.votingTestMode ? 'ambiente de teste' : 'status atual do evento'}
+              tone={settings.votingTestMode ? 'warning' : settings.votingState === 'OPEN' ? 'success' : 'neutral'}
+            />
+          </div>
+          {settings.votingTestMode && (
+            <div className="test-mode-notice flex flex-col gap-3 rounded-xl border px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-300/10 text-amber-200">
+                <FlaskConical className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-bold text-amber-100">Modo de teste ativo</h2>
+                <p className="mt-1 text-sm text-white/65">Os votos realizados agora não contam para a votação oficial.</p>
+              </div>
+            </div>
+          )}
+          <ActionGroups
+            settings={settings}
+            testVotes={dashboard.testVotes}
+            onToggleRegistration={toggleRegistration}
+            onToggleTestMode={toggleTestMode}
+            onClearTestVotes={clearTestVotes}
+            onToggleVoting={toggleVoting}
+          />
+          <nav className="admin-tabs -mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1" aria-label="Navegação administrativa">
+            {([
+              ['summary', 'Resumo', LayoutDashboard],
+              ['participants', 'Participantes', Users],
+              ['qr', 'QR Codes', QrCode],
+              ['results', 'Resultados', Trophy],
+              ['codes', 'Códigos', Ticket],
+              ['settings', 'Configurações', Settings],
+            ] as [Tab, string, LucideIcon][]).map(([item, title, Icon]) => (
+              <button
+                key={item}
+                type="button"
+                aria-current={tab === item ? 'page' : undefined}
+                className={`admin-tab ${tab === item ? 'admin-tab-active' : ''}`}
+                onClick={() => setTab(item)}
+              >
+                <Icon className="h-4 w-4 shrink-0" /> {title}
+              </button>
+            ))}
+          </nav>
+          {tab === 'summary' && <SummaryAdmin
+            settings={settings}
+            participants={participants}
+            totalVotes={dashboard.votes}
+            onGoParticipants={() => setTab('participants')}
+            onGoSettings={() => setTab('settings')}
+          />}
+          {tab === 'participants' && <ParticipantsAdmin participants={participants} onCreate={() => setCreating(true)} onEdit={setEditing} onDelete={removeParticipant} />}
+          {tab === 'codes' && <CodesAdmin codes={codes} onGenerate={generateCodes} />}
+          {tab === 'qr' && (
+            <QrAdmin
+              settings={settings}
+              participants={participants}
+              totalVotes={dashboard.votes}
+              onDownload={() => downloadQr('admin-voting-qr-download', 'qr-votacao-halloween.png')}
+              onDownloadRegistration={() => downloadQr('admin-registration-qr-download', 'qr-cadastro-halloween.png')}
+            />
+          )}
+          {tab === 'results' && <Ranking results={results} />}
+          {tab === 'settings' && <SettingsAdmin settings={settings} onSave={saveSettings} />}
+        </>
+      ) : (
+        <div className="card grid gap-3">
+          <p className="font-semibold text-white">Não foi possível carregar os dados do painel.</p>
+          <button className="btn-secondary w-fit" onClick={() => {
+            setIsLoading(true);
+            load().catch((error) => {
+              setIsLoading(false);
+              toast.error(apiMessage(error));
+            });
+          }}>Tentar novamente</button>
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
-        {settings && (
-          <button className={settings.registrationOpen ? 'btn-secondary' : 'btn-primary'} onClick={() => saveSettings({ ...settings, registrationOpen: !settings.registrationOpen })}>
-            {settings.registrationOpen ? 'Encerrar cadastros' : 'Abrir cadastros'}
-          </button>
-        )}
-        {settings && (
-          <button className={settings.votingTestMode ? 'btn-secondary' : 'btn-primary'} onClick={() => saveSettings({ ...settings, votingTestMode: !settings.votingTestMode, showLiveResults: true })}>
-            {settings.votingTestMode ? 'Desativar modo de teste' : 'Ativar modo de teste'}
-          </button>
-        )}
-        {settings?.votingTestMode && <a className="btn-primary" href="/votar" target="_blank" rel="noreferrer">Testar votação</a>}
-        <button className="btn-secondary" onClick={clearTestVotes}>Limpar votos de teste</button>
-        <button className="btn-primary" onClick={() => toggleVoting(true)}>Abrir votação</button>
-        <button className="btn-secondary" onClick={() => toggleVoting(false)}>Encerrar votação</button>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {(['summary', 'participants', 'qr', 'results', 'codes', 'settings'] as Tab[]).map((item) => (
-          <button key={item} className={tab === item ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'} onClick={() => setTab(item)}>
-            {labelFor(item)}
-          </button>
-        ))}
-      </div>
-      {tab === 'summary' && settings && <SummaryAdmin settings={settings} participants={participants} totalVotes={dashboard?.votes ?? 0} onGoParticipants={() => setTab('participants')} />}
-      {tab === 'participants' && <ParticipantsAdmin participants={participants} onCreate={() => setCreating(true)} onEdit={setEditing} onDelete={removeParticipant} />}
-      {tab === 'codes' && <CodesAdmin codes={codes} onGenerate={generateCodes} />}
-      {tab === 'qr' && settings && (
-        <QrAdmin
-          settings={settings}
-          participants={participants}
-          totalVotes={dashboard?.votes ?? 0}
-          onDownload={() => downloadQr('admin-voting-qr-download', 'qr-votacao-halloween.png')}
-          onDownloadRegistration={() => downloadQr('admin-registration-qr-download', 'qr-cadastro-halloween.png')}
-        />
-      )}
-      {tab === 'results' && <Ranking results={results} />}
-      {tab === 'settings' && settings && <SettingsAdmin settings={settings} onSave={saveSettings} />}
       <QRCodeCanvas id="admin-registration-qr-download" className="hidden" value={publicRegistrationUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       <QRCodeCanvas id="admin-voting-qr-download" className="hidden" value={publicVotingUrl()} size={1200} bgColor="#ffffff" fgColor="#111111" marginSize={4} />
       <ParticipantModal
@@ -224,33 +309,170 @@ function participantPayload(values: ParticipantFormValues) {
   return payload;
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div className="card"><p className="text-xs uppercase text-white/50">{label}</p><p className="mt-2 text-2xl font-black text-white">{value}</p></div>;
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  caption,
+  tone = 'neutral',
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  caption: string;
+  tone?: 'neutral' | 'success' | 'warning';
+}) {
+  return (
+    <article className={`metric-card metric-${tone} min-w-0 rounded-xl border p-4 sm:p-5`}>
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0 text-ember" />
+        <p className="truncate text-xs font-bold uppercase tracking-wide text-white/60">{label}</p>
+      </div>
+      <p className="mt-4 truncate text-[28px] font-extrabold leading-none text-white sm:text-[32px]" title={String(value)}>{value}</p>
+      <p className="mt-2 truncate text-xs text-white/50">{caption}</p>
+    </article>
+  );
 }
 
-function labelFor(tab: Tab) {
-  return ({ summary: 'Resumo', participants: 'Participantes', qr: 'QR Codes', results: 'Resultados', codes: 'Códigos', settings: 'Configurações' })[tab];
+function DashboardSkeleton() {
+  return (
+    <div className="grid animate-pulse gap-6" role="status" aria-label="Carregando dados do painel">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} className="h-32 rounded-xl border border-white/10 bg-white/5" />
+        ))}
+      </div>
+      <div className="h-36 rounded-xl border border-white/10 bg-white/5" />
+      <div className="h-12 rounded-xl border border-white/10 bg-white/5" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="h-64 rounded-xl border border-white/10 bg-white/5" />
+        <div className="h-64 rounded-xl border border-white/10 bg-white/5" />
+      </div>
+    </div>
+  );
 }
 
-function SummaryAdmin({ settings, participants, totalVotes, onGoParticipants }: { settings: EventSettings; participants: Participant[]; totalVotes: number; onGoParticipants: () => void }) {
+function ActionGroups({
+  settings,
+  testVotes,
+  onToggleRegistration,
+  onToggleTestMode,
+  onClearTestVotes,
+  onToggleVoting,
+}: {
+  settings: EventSettings;
+  testVotes: number;
+  onToggleRegistration: (open: boolean) => void;
+  onToggleTestMode: (enabled: boolean) => void;
+  onClearTestVotes: () => void;
+  onToggleVoting: (open: boolean) => void;
+}) {
+  const votingOpen = settings.votingState === 'OPEN';
+  return (
+    <section className="grid gap-3 lg:grid-cols-3" aria-label="Ações administrativas">
+      <div className="action-card">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-white/65">Cadastros</h2>
+          <p className="mt-2 flex items-center gap-2 text-base font-semibold text-white">
+            <span className={`status-dot ${settings.registrationOpen ? 'bg-emerald-300' : 'bg-white/35'}`} />
+            {registrationStatusLabel(settings)}
+          </p>
+        </div>
+        <button
+          className={settings.registrationOpen ? 'btn-danger' : 'btn-primary'}
+          onClick={() => onToggleRegistration(!settings.registrationOpen)}
+        >
+          {settings.registrationOpen ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          {settings.registrationOpen ? 'Encerrar cadastros' : 'Abrir cadastros'}
+        </button>
+      </div>
+      <div className="action-card">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-white/65">Votação</h2>
+          <p className="mt-2 flex items-center gap-2 text-base font-semibold text-white">
+            <span className={`status-dot ${settings.votingTestMode ? 'bg-amber-300' : votingOpen ? 'bg-emerald-300' : 'bg-sky-300'}`} />
+            {votingStatusLabel(settings)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {settings.votingTestMode && <a className="btn-secondary" href="/votar" target="_blank" rel="noreferrer"><FlaskConical className="h-4 w-4" /> Testar votação</a>}
+          {votingOpen
+            ? <button className="btn-danger" onClick={() => onToggleVoting(false)}><XCircle className="h-4 w-4" /> Encerrar votação</button>
+            : <button className="btn-primary" onClick={() => onToggleVoting(true)}><Vote className="h-4 w-4" /> Abrir votação</button>}
+        </div>
+      </div>
+      <div className="action-card">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-white/65">Testes</h2>
+          <p className="mt-2 flex items-center gap-2 text-base font-semibold text-white">
+            <span className={`status-dot ${settings.votingTestMode ? 'bg-amber-300' : 'bg-white/35'}`} />
+            {settings.votingTestMode ? 'Modo ativo' : 'Modo inativo'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className={settings.votingTestMode ? 'btn-secondary' : 'btn-primary'}
+            onClick={() => onToggleTestMode(!settings.votingTestMode)}
+          >
+            {settings.votingTestMode ? 'Desativar modo teste' : 'Ativar modo teste'}
+          </button>
+          {testVotes > 0 && <button className="btn-danger" onClick={onClearTestVotes}><Trash2 className="h-4 w-4" /> Limpar votos</button>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SummaryAdmin({
+  settings,
+  participants,
+  totalVotes,
+  onGoParticipants,
+  onGoSettings,
+}: {
+  settings: EventSettings;
+  participants: Participant[];
+  totalVotes: number;
+  onGoParticipants: () => void;
+  onGoSettings: () => void;
+}) {
   const active = participants.filter((participant) => participant.active);
   const withPhoto = active.filter((participant) => !!participant.photoUrl);
   const missingPhotos = active.length - withPhoto.length;
   return (
-    <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-      <div className="card grid gap-3">
-        <h2 className="text-xl font-bold text-white">Status do evento</h2>
-        <Readiness label="Cadastros" value={registrationStatusLabel(settings)} ok={settings.registrationOpen} />
-        <Readiness label="Votação" value={votingStatusLabel(settings)} ok={settings.canAcceptVotes} />
-        <Readiness label="Total de votos" value={totalVotes} ok={totalVotes > 0} />
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className="card">
+        <div className="mb-3 flex items-center gap-2">
+          <Activity className="h-5 w-5 text-ember" />
+          <h2 className="text-lg font-bold text-white">Status do evento</h2>
+        </div>
+        <StatusRow label="Cadastros" value={registrationStatusLabel(settings)} tone={settings.registrationOpen ? 'success' : 'neutral'} />
+        <StatusRow label="Votação" value={votingStatusLabel(settings)} tone={settings.votingTestMode ? 'warning' : settings.votingState === 'OPEN' ? 'success' : 'info'} />
+        <StatusRow
+          label="Resultado"
+          value={settings.votingState === 'RESULT_PUBLISHED' ? 'Publicado' : 'Aguardando'}
+          tone={settings.votingState === 'RESULT_PUBLISHED' ? 'success' : 'info'}
+        />
+        <StatusRow label="Total de votos" value={totalVotes} tone="neutral" />
       </div>
-      <div className="card grid gap-3">
-        <h2 className="text-xl font-bold text-white">Preparação para a festa</h2>
+      <div className="card">
+        <div className="mb-3 flex items-center gap-2">
+          <CalendarClock className="h-5 w-5 text-ember" />
+          <h2 className="text-lg font-bold text-white">Preparação para a festa</h2>
+        </div>
         <Readiness label="Participantes cadastrados" value={participants.length} ok={participants.length > 0} />
         <Readiness label="Com foto" value={withPhoto.length} ok={withPhoto.length === active.length && active.length > 0} />
         <Readiness label="Sem foto" value={missingPhotos} ok={missingPhotos === 0} />
         <Readiness label="Cadastros" value={registrationStatusLabel(settings)} ok={settings.registrationOpen} />
-        <Readiness label="Data da festa" value={formatEventDate(settings) || 'Não definida'} ok={!!settings.eventDate} />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 py-3 last:border-0">
+          <span className="text-sm text-white/65">Data da festa</span>
+          {settings.eventDate
+            ? <span className="text-right text-sm font-semibold text-white">{formatEventDate(settings)}</span>
+            : <div className="flex items-center gap-3">
+                <span className="text-sm text-white/50">Não configurada</span>
+                <button className="text-sm font-semibold text-ember transition hover:text-orange-200" onClick={onGoSettings}>Configurar</button>
+              </div>}
+        </div>
         <Readiness label="QR Cadastro" value="Pronto" ok />
         <Readiness label="QR Votação" value="Pronto" ok />
         <Readiness label="Votação" value={votingStatusLabel(settings)} ok={settings.canAcceptVotes} />
@@ -404,9 +626,35 @@ function QrAdmin({
 
 function Readiness({ label, value, ok }: { label: string; value: string | number; ok: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
-      <span className="text-sm text-white/70">{label}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-white/8 py-3 last:border-0">
+      <span className="text-sm text-white/65">{label}</span>
       <span className={ok ? 'font-bold text-emerald-200' : 'font-bold text-amber-100'}>{value}</span>
+    </div>
+  );
+}
+
+function StatusRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone: 'success' | 'warning' | 'info' | 'neutral';
+}) {
+  const color = {
+    success: 'bg-emerald-300',
+    warning: 'bg-amber-300',
+    info: 'bg-sky-300',
+    neutral: 'bg-white/40',
+  }[tone];
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-white/8 py-3 last:border-0">
+      <span className="text-sm text-white/65">{label}</span>
+      <span className="flex items-center gap-2 text-right text-sm font-semibold text-white">
+        {typeof value === 'string' && <span className={`status-dot ${color}`} />}
+        {value}
+      </span>
     </div>
   );
 }
