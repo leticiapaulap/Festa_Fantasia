@@ -4,17 +4,22 @@ export type EventPhase = 'REGISTRATION' | 'PREPARATION' | 'VOTING' | 'FINISHED';
 
 export function eventPhase(settings: EventSettings | null): EventPhase {
   if (!settings) return 'REGISTRATION';
-  if (settings.votingStatus === 'CLOSED' || settings.votingAvailability === 'AFTER_WINDOW') return 'FINISHED';
-  if (settings.canAcceptVotes) return 'VOTING';
+  if (settings.votingState === 'RESULT_PUBLISHED' || settings.votingState === 'RESULT_PENDING' || settings.votingState === 'CLOSED') return 'FINISHED';
+  if (settings.votingState === 'OPEN' || settings.votingState === 'TEST') return 'VOTING';
   if (settings.registrationOpen) return 'REGISTRATION';
   return 'PREPARATION';
 }
 
 export function votingStatusLabel(settings: EventSettings | null) {
   if (!settings) return 'Aguardando';
-  if (settings.canAcceptVotes) return 'Aberta';
-  if (settings.votingStatus === 'CLOSED' || settings.votingAvailability === 'AFTER_WINDOW') return 'Encerrada';
-  return 'Aguardando';
+  return ({
+    TEST: 'Modo de teste',
+    WAITING: 'Aguardando',
+    OPEN: 'Aberta',
+    CLOSED: 'Encerrada',
+    RESULT_PENDING: 'Resultado pendente',
+    RESULT_PUBLISHED: 'Resultado publicado',
+  })[settings.votingState ?? settings.votingAvailability] ?? 'Aguardando';
 }
 
 export function registrationStatusLabel(settings: EventSettings | null) {

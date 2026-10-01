@@ -22,6 +22,9 @@ module.exports = async function handler(req, res) {
       return json(res, await participants.createPublicParticipant(req), 201);
     }
     if (req.method === 'GET' && path === 'results') return json(res, await results.results(true));
+    if (req.method === 'GET' && path === 'voting/status') return json(res, await settings.votingStatus());
+    if (req.method === 'GET' && path === 'voting/live-results') return json(res, await results.liveResults());
+    if (req.method === 'GET' && path === 'voting/results') return json(res, await results.finalResults());
     if (req.method === 'POST' && path === 'votes') return json(res, await voting.vote(await readJson(req)));
     if (req.method === 'POST' && path === 'vote-codes/validate') {
       return json(res, await voting.validateCode(await readJson(req)));
@@ -65,6 +68,9 @@ module.exports = async function handler(req, res) {
         if (req.method === 'GET' && path === 'admin/results') return json(res, await results.results(false));
         if (req.method === 'POST' && path === 'admin/votes/reset') {
           return json(res, await admin.resetVotes(await readJson(req)));
+        }
+        if (req.method === 'POST' && path === 'admin/test-votes/clear') {
+          return json(res, await admin.clearTestVotes(await readJson(req)));
         }
         throw httpError(404, 'Endpoint não encontrado.');
       });

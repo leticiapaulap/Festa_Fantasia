@@ -23,6 +23,11 @@ async function updateSettings(input) {
     showPublicResults: 'show_public_results',
     votingStart: 'voting_start',
     votingEnd: 'voting_end',
+    votingStartsAt: 'voting_start',
+    votingEndsAt: 'voting_end',
+    resultsRevealAt: 'results_reveal_at',
+    votingTestMode: 'voting_test_mode',
+    showLiveResults: 'show_live_results',
   })) {
     if (input[key] !== undefined) next[column] = input[key];
   }
@@ -32,7 +37,8 @@ async function updateSettings(input) {
     SET event_name=$1, title=$2, description=$3, event_date=$4, event_time=$5,
         voting_end_time=$6, timezone=$7, voting_open=$8, registration_open=$9,
         results_public=$10, voting_status=$11, show_public_results=$12,
-        voting_start=$13, voting_end=$14, updated_at=NOW()
+        voting_start=$13, voting_end=$14, results_reveal_at=$15,
+        voting_test_mode=$16, show_live_results=$17, updated_at=NOW()
     WHERE id=1
     RETURNING *
   `, [
@@ -40,6 +46,7 @@ async function updateSettings(input) {
     nullable(next.voting_end_time), next.timezone || 'America/Sao_Paulo', !!next.voting_open,
     !!next.registration_open, !!next.results_public, next.voting_status || 'DRAFT',
     !!next.show_public_results, nullable(next.voting_start), nullable(next.voting_end),
+    nullable(next.results_reveal_at), !!next.voting_test_mode, next.show_live_results !== false,
   ]);
   return settingsResponse(rows[0]);
 }
@@ -63,7 +70,8 @@ async function getSettingsEntity() {
 function settingsResponse(row) {
   const votingStart = votingStartsAt(row);
   const votingEnd = votingEndsAt(row);
-  const availabilityValue = availability(row);
+  const resultsReveal = resultsRevealAt(row);
+  const status = votingState(row);
   return {
     id: Number(row.id),
     eventName: row.event_name,
@@ -78,29 +86,46 @@ function settingsResponse(row) {
     resultsPublic: !!row.results_public,
     votingStatus: row.voting_status || (row.voting_open ? 'OPEN' : 'DRAFT'),
     showPublicResults: !!row.show_public_results,
+    showLiveResults: row.show_live_results !== false,
+    votingTestMode: !!row.voting_test_mode,
     votingStartsAt: votingStart ? votingStart.toISOString() : null,
     votingEndsAt: votingEnd ? votingEnd.toISOString() : null,
+    resultsRevealAt: resultsReveal ? resultsReveal.toISOString() : null,
     votingStart: votingStart ? votingStart.toISOString() : null,
     votingEnd: votingEnd ? votingEnd.toISOString() : null,
     canAcceptVotes: canAcceptVotes(row),
     publicVotingUrl: '/votar',
-    votingAvailability: availabilityValue,
+    votingAvailability: status,
+    votingState: status,
+    serverTime: new Date().toISOString(),
   };
 }
 
 function canAcceptVotes(settings) {
-  return settings.voting_status === 'OPEN' && availability(settings) === 'OPEN';
+  const state = votingState(settings);
+  return state === 'TEST' || state === 'OPEN';
 }
 
 function availability(settings) {
-  if (settings.voting_status === 'CLOSED') return 'CLOSED';
-  if (settings.voting_status !== 'OPEN') return 'DRAFT';
+  return votingState(settings);
+}
+
+function votingState(settings, now = new Date()) {
+  if (settings.voting_test_mode) return 'TEST';
   const start = votingStartsAt(settings);
   const end = votingEndsAt(settings);
-  const now = new Date();
-  if (!start) return 'NOT_CONFIGURED';
-  if (now < start) return 'BEFORE_WINDOW';
-  if (end && now > end) return 'AFTER_WINDOW';
+  const reveal = resultsRevealAt(settings);
+  if (settings.voting_status === 'CLOSED') {
+    if (reveal && now >= reveal) return 'RESULT_PUBLISHED';
+    if (reveal) return 'RESULT_PENDING';
+    return 'CLOSED';
+  }
+  if (!start || now < start) return 'WAITING';
+  if (end && now >= end) {
+    if (reveal && now < reveal) return 'RESULT_PENDING';
+    if (reveal && now >= reveal) return 'RESULT_PUBLISHED';
+    return 'CLOSED';
+  }
   return 'OPEN';
 }
 
@@ -118,11 +143,37 @@ function votingEndsAt(settings) {
   return settings.voting_end ? new Date(settings.voting_end) : null;
 }
 
+function resultsRevealAt(settings) {
+  return settings.results_reveal_at ? new Date(settings.results_reveal_at) : null;
+}
+
+async function votingStatus() {
+  const settings = await getSettingsEntity();
+  const start = votingStartsAt(settings);
+  const end = votingEndsAt(settings);
+  const reveal = resultsRevealAt(settings);
+  return {
+    status: votingState(settings),
+    serverTime: new Date().toISOString(),
+    votingStartsAt: start ? start.toISOString() : null,
+    votingEndsAt: end ? end.toISOString() : null,
+    resultsRevealAt: reveal ? reveal.toISOString() : null,
+    votingTestMode: !!settings.voting_test_mode,
+    showLiveResults: settings.show_live_results !== false,
+    timezone: settings.timezone || 'America/Sao_Paulo',
+  };
+}
+
 module.exports = {
   availability,
   canAcceptVotes,
   getSettings,
   getSettingsEntity,
+  resultsRevealAt,
   setVoting,
   updateSettings,
+  votingEndsAt,
+  votingStartsAt,
+  votingState,
+  votingStatus,
 };

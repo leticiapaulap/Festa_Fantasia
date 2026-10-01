@@ -1,5 +1,5 @@
 const { getPool } = require('./database');
-const { availability, canAcceptVotes } = require('./settings');
+const { votingState } = require('./settings');
 const { cryptoRandom, httpError, iso, normalizeCode } = require('./http');
 
 async function vote(input) {
@@ -7,18 +7,38 @@ async function vote(input) {
   try {
     await client.query('BEGIN');
     const settings = (await client.query('SELECT * FROM event_settings WHERE id=1')).rows[0];
-    if (!canAcceptVotes(settings)) throw httpError(409, messageForVoting(settings));
+    const state = votingState(settings);
+    if (!['TEST', 'OPEN'].includes(state)) throw httpError(409, messageForVoting(state));
+
+    const isTestVote = state === 'TEST';
     const code = normalizeCode(input.code);
     const codeResult = await client.query('SELECT * FROM vote_codes WHERE code=$1 FOR UPDATE', [code]);
     const voteCode = codeResult.rows[0];
     if (!voteCode) throw httpError(404, 'Código de votação inválido.');
-    if (voteCode.used) throw httpError(409, 'Este código já foi utilizado.');
+    if (!isTestVote && voteCode.used) throw httpError(409, 'Este código já foi utilizado.');
+
+    const alreadyVoted = await client.query(
+      'SELECT id FROM votes WHERE vote_code_id=$1 AND is_test_vote=$2',
+      [voteCode.id, isTestVote]
+    );
+    if (alreadyVoted.rows[0]) {
+      throw httpError(409, isTestVote ? 'Este código já foi utilizado no teste.' : 'Este código já foi utilizado.');
+    }
+
     const participant = await client.query('SELECT * FROM participants WHERE id=$1 AND active=TRUE', [input.participantId]);
     if (!participant.rows[0]) throw httpError(404, 'Participante não encontrado.');
-    await client.query('INSERT INTO votes (participant_id, vote_code_id) VALUES ($1, $2)', [input.participantId, voteCode.id]);
-    await client.query('UPDATE vote_codes SET used=TRUE, used_at=NOW() WHERE id=$1', [voteCode.id]);
+    await client.query(
+      'INSERT INTO votes (participant_id, vote_code_id, is_test_vote) VALUES ($1, $2, $3)',
+      [input.participantId, voteCode.id, isTestVote]
+    );
+    if (!isTestVote) {
+      await client.query('UPDATE vote_codes SET used=TRUE, used_at=NOW() WHERE id=$1', [voteCode.id]);
+    }
     await client.query('COMMIT');
-    return { message: 'Voto registrado com sucesso!' };
+    return {
+      message: isTestVote ? 'Voto de teste registrado com sucesso!' : 'Voto registrado com sucesso!',
+      testVote: isTestVote,
+    };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
@@ -27,10 +47,10 @@ async function vote(input) {
   }
 }
 
-function messageForVoting(settings) {
-  const state = availability(settings);
-  if (state === 'BEFORE_WINDOW') return 'A votação será liberada no horário do evento.';
-  if (state === 'AFTER_WINDOW' || state === 'CLOSED') return 'A votação está encerrada.';
+function messageForVoting(state) {
+  if (state === 'WAITING') return 'A votação será liberada no horário do evento.';
+  if (state === 'RESULT_PENDING') return 'A votação está encerrada. Aguarde o resultado final.';
+  if (state === 'RESULT_PUBLISHED' || state === 'CLOSED') return 'A votação está encerrada.';
   return 'A votação ainda não está aberta.';
 }
 

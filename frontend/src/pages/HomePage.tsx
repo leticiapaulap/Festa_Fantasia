@@ -3,7 +3,7 @@ import { CalendarClock, LockKeyhole, QrCode, Share2, Trophy, Users, Vote } from 
 import { QRCodeSVG } from 'qrcode.react';
 import { useMemo, type ReactNode } from 'react';
 import { eventPhase, formatEventDate } from '../services/eventPhase';
-import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
+import { publicVotingUrl } from '../services/publicUrl';
 import { useEventSettings } from '../services/useEventSettings';
 
 export function HomePage() {
@@ -11,13 +11,12 @@ export function HomePage() {
 
   const phase = settings ? eventPhase(settings) : null;
   const eventDate = formatEventDate(settings);
-  const registrationUrl = publicRegistrationUrl();
   const voteUrl = publicVotingUrl();
   const steps = useMemo(() => !phase ? [] : phase === 'VOTING'
     ? ['Escolha sua fantasia favorita', 'Confirme seu voto', 'Aguarde o resultado final']
     : ['Cadastre sua fantasia', 'Envie sua foto', 'Aguarde o dia da votação'], [phase]);
 
-  const copyRegistration = () => navigator.clipboard?.writeText(registrationUrl);
+  const copyVoting = () => navigator.clipboard?.writeText(voteUrl);
 
   return (
     <section className="grid gap-6 py-4 md:grid-cols-[1.02fr_minmax(20rem,0.98fr)] md:items-center md:py-10">
@@ -99,13 +98,14 @@ export function HomePage() {
         )}
         {phase === 'REGISTRATION' && (
           <QrPanel
-            title="CADASTRO"
-            description="Escaneie o QR Code para cadastrar sua fantasia."
-            value={registrationUrl}
-            footerTitle="Votação"
-            footerText="Aguardando o dia do evento."
-            action={<Link className="btn-primary md:hidden" to="/cadastro">Cadastrar minha fantasia</Link>}
-            extra={<button className="btn-secondary md:hidden" type="button" onClick={copyRegistration}><Share2 className="h-4 w-4" /> Copiar link</button>}
+            title="VOTAÇÃO"
+            description="Escaneie para acompanhar a contagem regressiva e acessar a votação quando ela for liberada."
+            value={voteUrl}
+            variant="vote"
+            footerTitle="Cadastro"
+            footerText="O QR de cadastro continua separado em /cadastro."
+            action={<Link className="btn-primary md:hidden" to="/votar">Abrir votação</Link>}
+            extra={<button className="btn-secondary md:hidden" type="button" onClick={copyVoting}><Share2 className="h-4 w-4" /> Copiar link</button>}
           />
         )}
         {phase === 'VOTING' && (
@@ -118,7 +118,13 @@ export function HomePage() {
           />
         )}
         {phase === 'PREPARATION' && (
-          <StatusPanel title="Votação aguardando" text="Cadastros encerrados. A votação será liberada durante o evento." />
+          <QrPanel
+            title="VOTAÇÃO"
+            description="Escaneie para acompanhar a contagem regressiva e acessar a votação quando ela for liberada."
+            value={voteUrl}
+            variant="vote"
+            action={<Link className="btn-primary md:hidden" to="/votar">Abrir votação</Link>}
+          />
         )}
         {phase === 'FINISHED' && (
           <StatusPanel title="Halloween" text="A votação foi encerrada. Obrigado por participar." />

@@ -52,7 +52,7 @@ async function ensureSchema() {
         CREATE TABLE IF NOT EXISTS votes (
           id BIGSERIAL PRIMARY KEY,
           participant_id BIGINT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
-          vote_code_id BIGINT NOT NULL UNIQUE REFERENCES vote_codes(id) ON DELETE RESTRICT,
+          vote_code_id BIGINT NOT NULL REFERENCES vote_codes(id) ON DELETE RESTRICT,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
         );
         CREATE TABLE IF NOT EXISTS event_settings (
@@ -81,6 +81,13 @@ async function ensureSchema() {
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_public_results BOOLEAN NOT NULL DEFAULT FALSE;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS timezone VARCHAR(80) NOT NULL DEFAULT 'America/Sao_Paulo';
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS voting_end_time TIME;
+        ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS results_reveal_at TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS voting_test_mode BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_live_results BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE votes ADD COLUMN IF NOT EXISTS is_test_vote BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_vote_code_id_key;
+        CREATE UNIQUE INDEX IF NOT EXISTS votes_vote_code_official_unique ON votes (vote_code_id) WHERE is_test_vote = FALSE;
+        CREATE UNIQUE INDEX IF NOT EXISTS votes_vote_code_test_unique ON votes (vote_code_id) WHERE is_test_vote = TRUE;
       `);
       await client.query(`
         INSERT INTO event_settings (

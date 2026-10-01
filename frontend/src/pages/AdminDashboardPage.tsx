@@ -25,7 +25,7 @@ export function AdminDashboardPage() {
   async function load() {
     const [dash, res, people, voteCodes, eventSettings] = await Promise.all([
       api.get<Dashboard>('/admin/dashboard'),
-      api.get<Results>('/results'),
+      api.get<Results>('/admin/results'),
       api.get<Participant[]>('/admin/participants'),
       api.get<VoteCode[]>('/admin/vote-codes'),
       api.get<EventSettings>('/settings'),
@@ -111,6 +111,17 @@ export function AdminDashboardPage() {
     }
   }
 
+  async function clearTestVotes() {
+    if (!window.confirm('Deseja apagar apenas os votos de teste?')) return;
+    try {
+      await api.post('/admin/test-votes/clear', { confirmation: 'Deseja apagar apenas os votos de teste?' });
+      toast.success('Votos de teste apagados.');
+      await load();
+    } catch (error) {
+      toast.error(apiMessage(error));
+    }
+  }
+
   function downloadQr(id: string, filename: string) {
     const canvas = document.getElementById(id) as HTMLCanvasElement | null;
     if (!canvas) return;
@@ -122,19 +133,32 @@ export function AdminDashboardPage() {
 
   return (
     <section className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Metric label="Participantes" value={dashboard?.participants ?? 0} />
-        <Metric label="Votos" value={dashboard?.votes ?? 0} />
+        <Metric label="Votos oficiais" value={dashboard?.votes ?? 0} />
+        <Metric label="Votos teste" value={dashboard?.testVotes ?? 0} />
         <Metric label="Códigos disponíveis" value={dashboard?.availableCodes ?? 0} />
         <Metric label="Códigos utilizados" value={dashboard?.usedCodes ?? 0} />
         <Metric label="Status" value={dashboard?.status ?? '...'} />
       </div>
+      {settings?.votingTestMode && (
+        <div className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-bold uppercase text-amber-100">
+          MODO DE TESTE ATIVO
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {settings && (
           <button className={settings.registrationOpen ? 'btn-secondary' : 'btn-primary'} onClick={() => saveSettings({ ...settings, registrationOpen: !settings.registrationOpen })}>
             {settings.registrationOpen ? 'Encerrar cadastros' : 'Abrir cadastros'}
           </button>
         )}
+        {settings && (
+          <button className={settings.votingTestMode ? 'btn-secondary' : 'btn-primary'} onClick={() => saveSettings({ ...settings, votingTestMode: !settings.votingTestMode, showLiveResults: true })}>
+            {settings.votingTestMode ? 'Desativar modo de teste' : 'Ativar modo de teste'}
+          </button>
+        )}
+        {settings?.votingTestMode && <a className="btn-primary" href="/votar" target="_blank" rel="noreferrer">Testar votação</a>}
+        <button className="btn-secondary" onClick={clearTestVotes}>Limpar votos de teste</button>
         <button className="btn-primary" onClick={() => toggleVoting(true)}>Abrir votação</button>
         <button className="btn-secondary" onClick={() => toggleVoting(false)}>Encerrar votação</button>
       </div>
@@ -345,7 +369,7 @@ function QrAdmin({
         <div>
           <p className="text-sm font-bold uppercase text-ember">QR Code de Votação — Halloween</p>
           <h2 className="mt-1 text-2xl font-black text-white">Votação</h2>
-          <p className="mt-2 text-white/65">Pré-visualização administrativa. O QR ainda não está público antes da janela e do status OPEN.</p>
+          <p className="mt-2 text-white/65">Disponível antes, durante e depois da votação. A página /votar muda conforme o status.</p>
           <p className="mt-2 text-sm font-bold text-white/70">Status: {votingStatusLabel(settings)}</p>
         </div>
         <div className="mx-auto grid aspect-square w-[min(300px,78vw)] place-items-center rounded-lg border border-white/10 bg-white p-5">
@@ -391,7 +415,7 @@ function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: 
   const [draft, setDraft] = useState(settings);
   useEffect(() => setDraft(settings), [settings]);
   return (
-    <form className="card grid gap-4" onSubmit={(event) => { event.preventDefault(); onSave(draft); }}>
+    <form className="card grid gap-4" onSubmit={(event) => { event.preventDefault(); onSave({ ...draft, votingStatus: 'SCHEDULED', votingOpen: false }); }}>
       <input className="input" value={draft.eventName} onChange={(e) => setDraft({ ...draft, eventName: e.target.value })} />
       <input className="input" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
       <textarea className="input min-h-24" value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
@@ -401,11 +425,45 @@ function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: 
         <input className="input" type="time" value={draft.votingEndTime ?? ''} onChange={(e) => setDraft({ ...draft, votingEndTime: e.target.value })} aria-label="Encerramento da votação" />
         <input className="input" value={draft.timezone ?? 'America/Sao_Paulo'} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })} placeholder="America/Sao_Paulo" aria-label="Timezone" />
       </div>
+      <div className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+        <div>
+          <p className="text-sm font-bold uppercase text-ember">Votação</p>
+          <p className="text-sm text-white/55">Controle oficial em America/Sao_Paulo</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="grid gap-2 text-sm font-semibold text-white/80">
+            Abertura
+            <input className="input" type="datetime-local" value={toDateTimeLocal(draft.votingStartsAt ?? draft.votingStart)} onChange={(e) => setDraft({ ...draft, votingStartsAt: fromDateTimeLocal(e.target.value), votingStart: fromDateTimeLocal(e.target.value) })} />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-white/80">
+            Encerramento
+            <input className="input" type="datetime-local" value={toDateTimeLocal(draft.votingEndsAt ?? draft.votingEnd)} onChange={(e) => setDraft({ ...draft, votingEndsAt: fromDateTimeLocal(e.target.value), votingEnd: fromDateTimeLocal(e.target.value) })} />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-white/80">
+            Resultado final
+            <input className="input" type="datetime-local" value={toDateTimeLocal(draft.resultsRevealAt)} onChange={(e) => setDraft({ ...draft, resultsRevealAt: fromDateTimeLocal(e.target.value) })} />
+          </label>
+        </div>
+      </div>
       <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.registrationOpen} onChange={(e) => setDraft({ ...draft, registrationOpen: e.target.checked })} /> Cadastro aberto</label>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.votingTestMode} onChange={(e) => setDraft({ ...draft, votingTestMode: e.target.checked })} /> Modo de teste da votação</label>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.showLiveResults} onChange={(e) => setDraft({ ...draft, showLiveResults: e.target.checked })} /> Exibir resultado parcial durante votação</label>
       <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.resultsPublic} onChange={(e) => setDraft({ ...draft, resultsPublic: e.target.checked, showPublicResults: e.target.checked })} /> Resultado público</label>
       <button className="btn-primary w-full">Salvar configurações</button>
     </form>
   );
+}
+
+function toDateTimeLocal(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function fromDateTimeLocal(value: string) {
+  return value ? new Date(value).toISOString() : '';
 }
 
 function ParticipantModal({

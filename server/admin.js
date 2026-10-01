@@ -8,15 +8,17 @@ const { clean, httpError, normalizeCode, normalizeEmail } = require('./http');
 async function dashboard() {
   const settings = await getSettings();
   const eventResults = await results(false);
-  const [participants, votes, availableCodes, usedCodes] = await Promise.all([
+  const [participants, votes, testVotes, availableCodes, usedCodes] = await Promise.all([
     scalar('SELECT COUNT(*)::int AS total FROM participants'),
-    scalar('SELECT COUNT(*)::int AS total FROM votes'),
+    scalar('SELECT COUNT(*)::int AS total FROM votes WHERE is_test_vote=FALSE'),
+    scalar('SELECT COUNT(*)::int AS total FROM votes WHERE is_test_vote=TRUE'),
     scalar('SELECT COUNT(*)::int AS total FROM vote_codes WHERE used=FALSE'),
     scalar('SELECT COUNT(*)::int AS total FROM vote_codes WHERE used=TRUE'),
   ]);
   return {
     participants,
     votes,
+    testVotes,
     availableCodes,
     usedCodes,
     status: settings.canAcceptVotes ? 'VOTAÇÃO ABERTA' : settings.votingAvailability,
@@ -27,7 +29,13 @@ async function dashboard() {
 
 async function resetVotes(input) {
   if (input.confirmation !== 'RESETAR VOTOS') throw httpError(400, 'Confirmação inválida.');
-  await getPool().query('DELETE FROM votes; UPDATE vote_codes SET used=FALSE, used_at=NULL;');
+  await getPool().query('DELETE FROM votes WHERE is_test_vote=FALSE; UPDATE vote_codes SET used=FALSE, used_at=NULL;');
+  return {};
+}
+
+async function clearTestVotes(input) {
+  if (input.confirmation !== 'Deseja apagar apenas os votos de teste?') throw httpError(400, 'Confirmação inválida.');
+  await getPool().query('DELETE FROM votes WHERE is_test_vote=TRUE;');
   return {};
 }
 
@@ -164,6 +172,7 @@ module.exports = {
   dashboard,
   login,
   registerAdmin,
+  clearTestVotes,
   resetVotes,
   withAdmin,
 };
