@@ -17,19 +17,41 @@ async function getParticipant(id) {
 }
 
 async function createPublicParticipant(req) {
-  const settings = await getSettingsEntity();
-  if (!settings.registration_open || canAcceptVotes(settings)) throw httpError(409, 'O período de cadastro foi encerrado.');
-  const { fields, files } = await parseMultipart(req);
-  const photo = files.photo;
-  if (!photo) throw httpError(400, 'Selecione uma imagem para upload.');
-  const photoUrl = await uploadPhoto(photo);
-  return insertParticipant({
-    name: requireText(fields.name, 'Informe o nome do participante.'),
-    costumeName: requireText(fields.costumeName, 'Informe o nome da fantasia.'),
-    description: clean(fields.description),
-    photoUrl,
-    active: true,
-  });
+  let stage = 'registration check';
+  try {
+    const settings = await getSettingsEntity();
+    if (!settings.registration_open) throw httpError(409, 'O período de cadastro foi encerrado.');
+    logParticipantCreate(stage, 'ok');
+
+    stage = 'multipart parsing';
+    const { fields, files } = await parseMultipart(req);
+    logParticipantCreate(stage, 'ok');
+
+    stage = 'validation';
+    const name = requireText(fields.name, 'Informe o nome do participante.');
+    const costumeName = requireText(fields.costumeName, 'Informe o nome da fantasia.');
+    const photo = files.photo;
+    if (!photo) throw httpError(400, 'Selecione uma imagem para upload.');
+    logParticipantCreate(stage, 'ok');
+
+    stage = 'photo upload';
+    const photoUrl = await uploadPhoto(photo);
+    logParticipantCreate(stage, 'ok');
+
+    stage = 'database insert';
+    const participant = await insertParticipant({
+      name,
+      costumeName,
+      description: clean(fields.description),
+      photoUrl,
+      active: true,
+    });
+    logParticipantCreate(stage, 'ok');
+    return { success: true, participant };
+  } catch (error) {
+    logParticipantCreate(stage, 'failed', error);
+    throw error;
+  }
 }
 
 async function createAdminParticipant(req) {
@@ -45,12 +67,26 @@ async function createAdminParticipant(req) {
 }
 
 async function insertParticipant(input) {
-  const { rows } = await getPool().query(`
-    INSERT INTO participants (name, costume_name, description, photo_url, active)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING *
-  `, [input.name, input.costumeName, input.description, input.photoUrl, input.active]);
-  return participantResponse(rows[0]);
+  try {
+    const { rows } = await getPool().query(`
+      INSERT INTO participants (name, costume_name, description, photo_url, active)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [input.name, input.costumeName, input.description, input.photoUrl, input.active]);
+    return participantResponse(rows[0]);
+  } catch (error) {
+    if (typeof error.code === 'string') {
+      console.error('[participants:create]', JSON.stringify({
+        endpoint: '/api/participants',
+        method: 'POST',
+        stage: 'database insert',
+        result: 'failed',
+        errorType: error.name || 'Error',
+        errorCode: error.code,
+      }));
+    }
+    throw participantDatabaseError(error);
+  }
 }
 
 async function updateParticipant(id, req) {
@@ -105,7 +141,9 @@ async function uploadPhoto(file) {
   if (file.buffer.length > 5 * 1024 * 1024) throw httpError(400, 'A imagem deve ter no máximo 5 MB.');
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !uploadPreset) throw httpError(500, 'Storage de fotos não configurado.');
+  if (!cloudName || !uploadPreset) {
+    throw httpError(422, 'Não foi possível enviar a foto. O armazenamento de fotos não está configurado.');
+  }
   const extension = file.mimeType === 'image/png' ? '.png' : file.mimeType === 'image/webp' ? '.webp' : '.jpg';
   const filename = `participants/${cryptoRandom()}${extension}`;
   const body = new FormData();
@@ -113,31 +151,115 @@ async function uploadPhoto(file) {
   body.append('upload_preset', uploadPreset);
   body.append('folder', 'festa-fantasia/participants');
   body.append('public_id', filename);
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.secure_url) throw httpError(502, 'Upload da foto falhou. Verifique a configuração do Cloudinary.');
-  return data.secure_url;
+  try {
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.secure_url !== 'string' || !data.secure_url) {
+      console.error('[participants:create]', JSON.stringify({
+        endpoint: '/api/participants',
+        method: 'POST',
+        stage: 'photo upload',
+        result: 'failed',
+        uploadStatus: response.status,
+        secureUrlReturned: typeof data.secure_url === 'string' && !!data.secure_url,
+      }));
+      throw httpError(422, 'Não foi possível enviar a foto. Verifique o arquivo e a configuração do armazenamento.');
+    }
+    return data.secure_url;
+  } catch (error) {
+    if (error.status) throw error;
+    logParticipantCreate('photo upload request', 'failed', error);
+    throw httpError(502, 'Não foi possível enviar a foto. Tente novamente.');
+  }
 }
 
 function parseMultipart(req) {
   return new Promise((resolve, reject) => {
+    if (typeof req.pipe !== 'function') {
+      reject(httpError(400, 'Não foi possível ler os dados do cadastro. Envie novamente o formulário.'));
+      return;
+    }
+    if (!/^multipart\/form-data\b/i.test(req.headers['content-type'] || '')) {
+      reject(httpError(400, 'Envie os dados do cadastro como formulário com foto.'));
+      return;
+    }
     const fields = {};
     const files = {};
-    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 5 * 1024 * 1024 } });
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    let busboy;
+    try {
+      busboy = Busboy({
+        headers: req.headers,
+        limits: { fileSize: 5 * 1024 * 1024 },
+      });
+    } catch {
+      reject(httpError(400, 'Não foi possível ler os dados do cadastro. Envie novamente o formulário.'));
+      return;
+    }
     busboy.on('field', (name, value) => { fields[name] = value; });
     busboy.on('file', (name, file, info) => {
       const chunks = [];
       file.on('data', (chunk) => chunks.push(chunk));
-      file.on('limit', () => reject(httpError(400, 'A imagem deve ter no máximo 5 MB.')));
+      file.on('limit', () => fail(httpError(400, 'A imagem deve ter no máximo 5 MB.')));
       file.on('end', () => {
         const buffer = Buffer.concat(chunks);
         if (buffer.length) files[name] = { buffer, filename: info.filename, mimeType: info.mimeType };
       });
     });
-    busboy.on('error', reject);
-    busboy.on('finish', () => resolve({ fields, files }));
+    busboy.on('error', fail);
+    busboy.on('finish', () => {
+      if (settled) return;
+      settled = true;
+      resolve({ fields, files });
+    });
+    req.on('error', fail);
     req.pipe(busboy);
   });
+}
+
+function participantDatabaseError(error) {
+  switch (error.code) {
+    case '23505':
+      return httpError(409, 'Já existe um cadastro com esses dados.');
+    case '23503':
+      return httpError(400, 'Não foi possível vincular os dados do participante.');
+    case '42P01':
+      return httpError(500, 'A tabela de participantes não está disponível no banco de dados.');
+    case '42703':
+      return httpError(500, 'A estrutura da tabela de participantes está desatualizada.');
+    case '28P01':
+    case '3D000':
+    case '08000':
+    case '08001':
+    case '08003':
+    case '08006':
+      return httpError(503, 'Não foi possível conectar ao banco de dados. Verifique a configuração do servidor.');
+    default:
+      return error;
+  }
+}
+
+function logParticipantCreate(stage, result, error) {
+  const message = {
+    endpoint: '/api/participants',
+    method: 'POST',
+    stage,
+    result,
+  };
+  if (error) {
+    message.errorType = error.name || 'Error';
+    if (typeof error.code === 'string') message.errorCode = error.code;
+    if (typeof error.status === 'number') message.status = error.status;
+    if (typeof error.stack === 'string') message.stack = error.stack.split('\n').slice(1);
+    console.error('[participants:create]', JSON.stringify(message));
+    return;
+  }
+  console.info('[participants:create]', JSON.stringify(message));
 }
 
 module.exports = {

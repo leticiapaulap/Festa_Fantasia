@@ -72,6 +72,16 @@ module.exports = async function handler(req, res) {
 
     throw httpError(404, 'Endpoint não encontrado.');
   } catch (error) {
+    const endpoint = req.url?.split('?')[0] || 'unknown';
+    const details = {
+      endpoint,
+      method: req.method || 'unknown',
+      errorType: error.name || 'Error',
+    };
+    if (typeof error.code === 'string') details.errorCode = error.code;
+    if (typeof error.status === 'number') details.status = error.status;
+    if (typeof error.stack === 'string') details.stack = error.stack.split('\n').slice(1);
+    console.error('[api:request] failed', JSON.stringify(details));
     sendError(res, error);
   }
 };

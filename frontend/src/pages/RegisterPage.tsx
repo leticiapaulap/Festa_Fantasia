@@ -37,8 +37,8 @@ export function RegisterPage() {
       payload.append('costumeName', values.costumeName);
       if (values.description) payload.append('description', values.description);
       if (photo) payload.append('photo', photo);
-      const { data } = await api.post<Participant>('/participants', payload);
-      setCreated(data);
+      const { data } = await api.post<{ success: true; participant: Participant }>('/participants', payload);
+      setCreated(data.participant);
       setPhoto(null);
       reset();
       toast.success('Cadastro realizado com sucesso!');

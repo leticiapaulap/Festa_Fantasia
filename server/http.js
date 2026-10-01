@@ -20,9 +20,33 @@ function json(res, body, status = 200) {
 }
 
 function sendError(res, error) {
-  const status = error.status || 500;
-  const message = status >= 500 ? 'Erro interno do servidor.' : error.message || 'Erro interno do servidor.';
+  const databaseError = databaseErrorResponse(error);
+  const status = databaseError?.status ?? error.status ?? 500;
+  const message = databaseError?.message
+    ?? (status >= 500 && !error.expose ? 'Erro interno do servidor.' : error.message || 'Erro interno do servidor.');
   json(res, { message, details: [] }, status);
+}
+
+function databaseErrorResponse(error) {
+  switch (error.code) {
+    case '23505':
+      return { status: 409, message: 'Já existe um cadastro com esses dados.' };
+    case '23503':
+      return { status: 400, message: 'Não foi possível vincular os dados do participante.' };
+    case '42P01':
+      return { status: 500, message: 'Uma tabela necessária não está disponível no banco de dados.' };
+    case '42703':
+      return { status: 500, message: 'A estrutura do banco de dados está desatualizada.' };
+    case '28P01':
+    case '3D000':
+    case '08000':
+    case '08001':
+    case '08003':
+    case '08006':
+      return { status: 503, message: 'Não foi possível conectar ao banco de dados. Verifique a configuração do servidor.' };
+    default:
+      return null;
+  }
 }
 
 function httpError(status, message, expose = true) {
