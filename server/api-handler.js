@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
   try {
     await ensureSchema();
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
-    const path = url.pathname.replace(/^\/api\/?/, '');
+    const path = apiPath(url);
     const parts = path.split('/').filter(Boolean);
 
     if (req.method === 'GET' && path === 'settings') return json(res, await settings.getSettings());
@@ -91,3 +91,9 @@ module.exports = async function handler(req, res) {
     sendError(res, error);
   }
 };
+
+function apiPath(url) {
+  const rewrittenPath = url.searchParams.get('path');
+  if (rewrittenPath) return rewrittenPath.replace(/^\/+/, '').replace(/\/+$/, '');
+  return url.pathname.replace(/^\/api\/?/, '').replace(/\/+$/, '');
+}
