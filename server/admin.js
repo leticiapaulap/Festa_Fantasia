@@ -73,12 +73,35 @@ async function createAdmin(input, email) {
 
 async function login(input) {
   const email = normalizeEmail(input.email);
-  const { rows } = await getPool().query('SELECT * FROM admin_users WHERE LOWER(email)=LOWER($1)', [email]);
-  const admin = rows[0];
-  if (!admin || !(await bcrypt.compare(input.password || '', admin.password_hash))) {
-    throw httpError(401, 'E-mail ou senha inválidos.');
+  safeLoginLog('request received');
+  try {
+    const { rows } = await getPool().query(
+      'SELECT id, name, email, password_hash, created_at FROM admin_users WHERE LOWER(email) = $1',
+      [email]
+    );
+    safeLoginLog('database connected');
+
+    const admin = rows[0];
+    safeLoginLog('user lookup', { userFound: !!admin });
+    if (!admin) {
+      throw httpError(401, 'E-mail ou senha inválidos.');
+    }
+
+    safeLoginLog('hash format', { hashPrefix: hashPrefix(admin.password_hash) });
+    const passwordValid = await bcrypt.compare(input.password || '', admin.password_hash);
+    safeLoginLog('password check', { passwordValid });
+    if (!passwordValid) {
+      throw httpError(401, 'E-mail ou senha inválidos.');
+    }
+
+    const response = loginResponse(admin);
+    safeLoginLog('session created');
+    return response;
+  } catch (error) {
+    safeLoginLog('failed', safeLoginErrorDetails(error));
+    if (error.status === 401) throw error;
+    throw httpError(500, 'Não foi possível acessar o servidor.');
   }
-  return loginResponse(admin);
 }
 
 function validateAdminCode(code) {
@@ -113,6 +136,26 @@ function jwtSecret() {
   const secret = process.env.JWT_SECRET || 'dev-secret-change-this-value-with-at-least-32-characters';
   if (secret.length < 32) throw httpError(500, 'JWT_SECRET precisa ter pelo menos 32 caracteres.');
   return secret;
+}
+
+function hashPrefix(hash) {
+  return typeof hash === 'string' ? hash.slice(0, 4) : '';
+}
+
+function safeLoginErrorDetails(error) {
+  const details = {
+    errorType: error.name || 'Error',
+  };
+  if (typeof error.code === 'string') details.errorCode = error.code;
+  if (typeof error.status === 'number') details.status = error.status;
+  return details;
+}
+
+function safeLoginLog(stage, details = {}) {
+  console.info('[admin-login]', JSON.stringify({
+    stage,
+    ...details,
+  }));
 }
 
 module.exports = {
