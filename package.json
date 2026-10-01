@@ -2,6 +2,7 @@
   "private": true,
   "type": "commonjs",
   "dependencies": {
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3",
     "busboy": "^1.6.0",
     "jsonwebtoken": "^9.0.2",

@@ -1,4 +1,5 @@
 const Busboy = require('busboy');
+const { put } = require('@vercel/blob');
 const { getPool } = require('./database');
 const { canAcceptVotes, getSettingsEntity } = require('./settings');
 const { clean, cryptoRandom, httpError, iso, parseBool, requireText } = require('./http');
@@ -139,33 +140,17 @@ async function uploadPhoto(file) {
   const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
   if (!allowed.has(file.mimeType)) throw httpError(400, 'Selecione uma imagem JPG, PNG ou WEBP.');
   if (file.buffer.length > 5 * 1024 * 1024) throw httpError(400, 'A imagem deve ter no máximo 5 MB.');
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !uploadPreset) {
-    throw httpError(422, 'Não foi possível enviar a foto. O armazenamento de fotos não está configurado.');
-  }
   const extension = file.mimeType === 'image/png' ? '.png' : file.mimeType === 'image/webp' ? '.webp' : '.jpg';
-  const filename = `participants/${cryptoRandom()}${extension}`;
-  const body = new FormData();
-  body.append('file', new Blob([file.buffer], { type: file.mimeType }), filename);
-  body.append('upload_preset', uploadPreset);
-  body.append('folder', 'festa-fantasia/participants');
-  body.append('public_id', filename);
+  const pathname = `participants/${cryptoRandom()}${extension}`;
   try {
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || typeof data.secure_url !== 'string' || !data.secure_url) {
-      console.error('[participants:create]', JSON.stringify({
-        endpoint: '/api/participants',
-        method: 'POST',
-        stage: 'photo upload',
-        result: 'failed',
-        uploadStatus: response.status,
-        secureUrlReturned: typeof data.secure_url === 'string' && !!data.secure_url,
-      }));
+    const blob = await put(pathname, file.buffer, {
+      access: 'public',
+      contentType: file.mimeType,
+    });
+    if (typeof blob.url !== 'string' || !blob.url) {
       throw httpError(422, 'Não foi possível enviar a foto. Verifique o arquivo e a configuração do armazenamento.');
     }
-    return data.secure_url;
+    return blob.url;
   } catch (error) {
     if (error.status) throw error;
     logParticipantCreate('photo upload request', 'failed', error);
