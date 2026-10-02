@@ -1,6 +1,9 @@
 {
   "private": true,
   "type": "commonjs",
+  "scripts": {
+    "test": "node --test server/*.test.js"
+  },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3",

@@ -47,18 +47,26 @@ async function resultsForMode({ isTestVote, status, resultsPublic, final }) {
     LEFT JOIN votes v ON v.participant_id = p.id AND v.is_test_vote = $1
     WHERE p.active = TRUE
     GROUP BY p.id
-    ORDER BY votes DESC, p.costume_name ASC
+    ORDER BY votes DESC, p.costume_name ASC, p.id ASC
   `, [isTestVote]);
   const totalVotes = rows.reduce((sum, row) => sum + Number(row.votes), 0);
-  const ranking = rows.map((row) => ({
-    participantId: Number(row.id),
-    participantName: row.name,
-    costumeName: row.costume_name,
-    description: row.description,
-    photoUrl: row.photo_url,
-    votes: Number(row.votes),
-    percentage: totalVotes ? Number(((Number(row.votes) / totalVotes) * 100).toFixed(2)) : 0,
-  }));
+  let position = 0;
+  let previousVotes = null;
+  const ranking = rows.map((row, index) => {
+    const votes = Number(row.votes);
+    if (votes !== previousVotes) position = index + 1;
+    previousVotes = votes;
+    return {
+      participantId: Number(row.id),
+      participantName: row.name,
+      costumeName: row.costume_name,
+      description: row.description,
+      photoUrl: row.photo_url,
+      votes,
+      percentage: totalVotes ? Number(((votes / totalVotes) * 100).toFixed(2)) : 0,
+      position: totalVotes ? position : null,
+    };
+  });
   const topVotes = ranking[0]?.votes || 0;
   const winners = topVotes > 0 ? ranking.filter((item) => item.votes === topVotes) : [];
   return {

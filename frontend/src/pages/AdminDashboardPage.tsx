@@ -7,13 +7,11 @@ import {
   Edit3,
   ExternalLink,
   FlaskConical,
-  KeyRound,
   LayoutDashboard,
   Monitor,
   Plus,
   QrCode,
   Settings,
-  Ticket,
   Trash2,
   Trophy,
   Users,
@@ -31,33 +29,30 @@ import { PhotoUpload } from '../components/PhotoUpload';
 import { api, apiMessage } from '../services/api';
 import { formatEventDate, registrationStatusLabel, votingStatusLabel } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
-import type { Dashboard, EventSettings, Participant, Results, VoteCode } from '../types/api';
+import type { Dashboard, EventSettings, Participant, Results } from '../types/api';
 
-type Tab = 'summary' | 'participants' | 'qr' | 'results' | 'codes' | 'settings';
+type Tab = 'summary' | 'participants' | 'qr' | 'results' | 'settings';
 
 export function AdminDashboardPage() {
   const [tab, setTab] = useState<Tab>('summary');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [codes, setCodes] = useState<VoteCode[]>([]);
   const [settings, setSettings] = useState<EventSettings | null>(null);
   const [editing, setEditing] = useState<Participant | null>(null);
   const [creating, setCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
-    const [dash, res, people, voteCodes, eventSettings] = await Promise.all([
+    const [dash, res, people, eventSettings] = await Promise.all([
       api.get<Dashboard>('/admin/dashboard'),
       api.get<Results>('/admin/results'),
       api.get<Participant[]>('/admin/participants'),
-      api.get<VoteCode[]>('/admin/vote-codes'),
       api.get<EventSettings>('/settings'),
     ]);
     setDashboard(dash.data);
     setResults(res.data);
     setParticipants(people.data);
-    setCodes(voteCodes.data);
     setSettings(eventSettings.data);
     setIsLoading(false);
   }
@@ -77,16 +72,6 @@ export function AdminDashboardPage() {
     try {
       await api.post(open ? '/admin/voting/open' : '/admin/voting/close');
       toast.success(open ? 'Votação aberta.' : 'Votação encerrada.');
-      await load();
-    } catch (error) {
-      toast.error(apiMessage(error));
-    }
-  }
-
-  async function generateCodes(quantity: number) {
-    try {
-      await api.post('/admin/vote-codes/generate', { quantity });
-      toast.success(`${quantity} código(s) gerado(s).`);
       await load();
     } catch (error) {
       toast.error(apiMessage(error));
@@ -182,12 +167,11 @@ export function AdminDashboardPage() {
       <AdminHeader testMode={settings?.votingTestMode ?? false} />
       {isLoading ? <DashboardSkeleton /> : dashboard && settings ? (
         <>
-          <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             <Metric icon={Users} label="Participantes" value={dashboard.participants} caption="cadastrados" />
             <Metric icon={Vote} label="Votos oficiais" value={dashboard.votes} caption="votos contabilizados" />
             <Metric icon={FlaskConical} label="Votos de teste" value={dashboard.testVotes} caption="fora do resultado oficial" tone="warning" />
-            <Metric icon={Ticket} label="Códigos disponíveis" value={dashboard.availableCodes} caption="prontos para uso" />
-            <Metric icon={KeyRound} label="Códigos utilizados" value={dashboard.usedCodes} caption="já utilizados" />
+            <Metric icon={Vote} label="Total de votos" value={dashboard.totalVotes} caption="oficiais e de teste" />
             <Metric
               icon={Activity}
               label="Status da votação"
@@ -221,7 +205,6 @@ export function AdminDashboardPage() {
               ['participants', 'Participantes', Users],
               ['qr', 'QR Codes', QrCode],
               ['results', 'Resultados', Trophy],
-              ['codes', 'Códigos', Ticket],
               ['settings', 'Configurações', Settings],
             ] as [Tab, string, LucideIcon][]).map(([item, title, Icon]) => (
               <button
@@ -243,7 +226,6 @@ export function AdminDashboardPage() {
             onGoSettings={() => setTab('settings')}
           />}
           {tab === 'participants' && <ParticipantsAdmin participants={participants} onCreate={() => setCreating(true)} onEdit={setEditing} onDelete={removeParticipant} />}
-          {tab === 'codes' && <CodesAdmin codes={codes} onGenerate={generateCodes} />}
           {tab === 'qr' && (
             <QrAdmin
               settings={settings}
@@ -337,8 +319,8 @@ function Metric({
 function DashboardSkeleton() {
   return (
     <div className="grid animate-pulse gap-6" role="status" aria-label="Carregando dados do painel">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {Array.from({ length: 6 }, (_, index) => (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }, (_, index) => (
           <div key={index} className="h-32 rounded-xl border border-white/10 bg-white/5" />
         ))}
       </div>
@@ -524,27 +506,6 @@ function ParticipantsAdmin({
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function CodesAdmin({ codes, onGenerate }: { codes: VoteCode[]; onGenerate: (quantity: number) => void }) {
-  const origin = window.location.origin;
-  return (
-    <div className="card grid gap-4">
-      <div className="flex flex-wrap gap-2">
-        {[1, 10, 50].map((qty) => <button key={qty} className="btn-primary" onClick={() => onGenerate(qty)}>Gerar {qty}</button>)}
-        <button className="btn-secondary" onClick={() => onGenerate(Number(window.prompt('Quantidade personalizada', '20') || 0))}>Quantidade personalizada</button>
-      </div>
-      <div className="grid gap-3">
-        {codes.map((code) => (
-          <div key={code.id} className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3 md:grid-cols-[1fr_auto_auto] md:items-center">
-            <div><p className="font-mono font-bold text-white">{code.code}</p><p className="text-sm text-white/50">{code.used ? 'Utilizado' : 'Disponível'}</p></div>
-            <div className="w-fit rounded-lg bg-white p-2"><QRCodeSVG value={`${origin}/votar?codigo=${code.code}`} size={76} /></div>
-            <button className="btn-secondary" onClick={() => navigator.clipboard.writeText(code.code)}><Copy className="h-4 w-4" /> Copiar</button>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

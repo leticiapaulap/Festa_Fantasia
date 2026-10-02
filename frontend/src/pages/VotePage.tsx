@@ -1,6 +1,7 @@
-import { Check, CheckCircle2, Clock3, KeyRound, Sparkles, Trophy, Users, Vote } from 'lucide-react';
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+import { Check, CheckCircle2, Clock3, Sparkles, Trophy, Users, Vote } from 'lucide-react';
+import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { BackHomeLink } from '../components/BackHomeLink';
 import { SkeletonGrid } from '../components/SkeletonGrid';
@@ -10,13 +11,11 @@ import type { Participant, RankingItem, Results, VotingStatus } from '../types/a
 const LIVE_RESULTS_INTERVAL_MS = 12000;
 
 export function VotePage() {
-  const [params] = useSearchParams();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [status, setStatus] = useState<VotingStatus | null>(null);
   const [liveResults, setLiveResults] = useState<Results | null>(null);
   const [liveUpdatedAt, setLiveUpdatedAt] = useState<string | null>(null);
   const [finalResults, setFinalResults] = useState<Results | null>(null);
-  const [code, setCode] = useState(params.get('codigo') ?? '');
   const [selected, setSelected] = useState<Participant | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -74,7 +73,6 @@ export function VotePage() {
     return () => window.clearInterval(id);
   }, [loadFinalResults, loadLiveResults, loadStatus]);
 
-  const normalizedCode = useMemo(() => code.trim().toUpperCase(), [code]);
   const target = countdownTarget(status);
   const remaining = target ? Math.max(0, target.getTime() - tick) : 0;
   const canVote = status?.status === 'OPEN' || status?.status === 'TEST';
@@ -86,8 +84,8 @@ export function VotePage() {
   }, [loadFinalResults, loadLiveResults, loadStatus, remaining, status, target]);
 
   function selectParticipant(participant: Participant) {
+    if (done || status?.hasVoted) return;
     setSelected(participant);
-    setDone(false);
     setFormError('');
   }
 
@@ -98,37 +96,25 @@ export function VotePage() {
       setFormError('Selecione uma fantasia.');
       return;
     }
-    if (!normalizedCode) {
-      setFormError('Informe o código de votação.');
-      return;
-    }
-
     setSubmitting(true);
     setFormError('');
     try {
-      const payload = { participantId: selected.id, code: normalizedCode };
-      const { data } = await api.post<{ testVote?: boolean }>('/votes', payload);
+      const { data } = await api.post<{ testVote?: boolean }>('/votes', { participantId: selected.id });
       setDone(true);
       setLastVoteWasTest(!!data.testVote);
-      setCode('');
       toast.success(data.testVote ? 'Voto de teste registrado!' : 'Voto registrado!');
       const nextStatus = await loadStatus();
       await loadLiveResults(nextStatus);
     } catch (error) {
       const message = apiMessage(error);
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        setStatus((current) => current ? { ...current, hasVoted: true } : current);
+      }
       setFormError(message);
       toast.error(message);
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function resetVoteFlow() {
-    setDone(false);
-    setSelected(null);
-    setCode('');
-    setFormError('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   return (
@@ -201,6 +187,7 @@ export function VotePage() {
                     key={participant.id}
                     participant={participant}
                     selected={selected?.id === participant.id}
+                    disabled={done || !!status.hasVoted}
                     onSelect={() => selectParticipant(participant)}
                   />
                 ))}
@@ -208,18 +195,13 @@ export function VotePage() {
             </section>
 
             <ConfirmationPanel
-              code={code}
               done={done}
               error={formError}
               lastVoteWasTest={lastVoteWasTest}
-              normalizedCode={normalizedCode}
-              onCodeChange={(value) => {
-                setCode(value);
-                setFormError('');
-              }}
-              onReset={resetVoteFlow}
               onSubmit={confirmVote}
+              onViewResults={() => document.getElementById('resultado-parcial')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               selected={selected}
+              alreadyVoted={!!status.hasVoted}
               status={status}
               submitting={submitting}
             />
@@ -250,9 +232,9 @@ function Badge({ children, tone = 'default' }: { children: ReactNode; tone?: 'de
 }
 
 function StepRail() {
-  const steps = ['Escolher', 'Código', 'Confirmar', 'Resultado'];
+  const steps = ['Escolher fantasia', 'Confirmar voto'];
   return (
-    <div className="mt-6 grid gap-2 sm:grid-cols-4">
+    <div className="mt-6 grid gap-2 sm:grid-cols-2">
       {steps.map((step, index) => (
         <div key={step} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-3">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ember text-sm font-black text-night">{index + 1}</span>
@@ -263,11 +245,12 @@ function StepRail() {
   );
 }
 
-function VotingParticipantCard({ participant, selected, onSelect }: { participant: Participant; selected: boolean; onSelect: () => void }) {
+function VotingParticipantCard({ participant, selected, disabled, onSelect }: { participant: Participant; selected: boolean; disabled: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
+      disabled={disabled}
       onClick={onSelect}
       className={`glass group grid min-h-full gap-4 rounded-lg p-4 text-left transition duration-300 hover:-translate-y-1 hover:border-ember/55 focus:outline-none focus:ring-2 focus:ring-ember/30 ${
         selected ? 'border-ember bg-ember/10 shadow-glow ring-2 ring-ember/25' : ''
@@ -299,47 +282,38 @@ function VotingParticipantCard({ participant, selected, onSelect }: { participan
 }
 
 function ConfirmationPanel({
-  code,
   done,
   error,
   lastVoteWasTest,
-  normalizedCode,
-  onCodeChange,
-  onReset,
+  onViewResults,
   onSubmit,
   selected,
+  alreadyVoted,
   status,
   submitting,
 }: {
-  code: string;
   done: boolean;
   error: string;
   lastVoteWasTest: boolean;
-  normalizedCode: string;
-  onCodeChange: (value: string) => void;
-  onReset: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onViewResults: () => void;
   selected: Participant | null;
+  alreadyVoted: boolean;
   status: VotingStatus;
   submitting: boolean;
 }) {
-  if (done) {
+  if (done || alreadyVoted) {
     return (
       <aside className="glass grid gap-4 rounded-lg p-5 text-center xl:sticky xl:top-6">
         <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-300" />
         <div>
-          <p className="text-sm font-black uppercase text-ember">Voto registrado!</p>
-          <h2 className="mt-1 text-2xl font-black text-white">Seu voto foi contabilizado com sucesso.</h2>
+          <p className="text-sm font-black uppercase text-ember">{alreadyVoted && !done ? 'Você já votou nesta votação.' : 'Voto registrado!'}</p>
+          <h2 className="mt-1 text-2xl font-black text-white">{alreadyVoted && !done ? 'Seu voto já foi contabilizado.' : 'Seu voto foi contabilizado com sucesso.'}</h2>
         </div>
         {lastVoteWasTest && <p className="rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm font-bold text-amber-100">Voto salvo como teste. Ele não entra no resultado oficial.</p>}
-        <button
-          type="button"
-          className="btn-primary w-full"
-          onClick={() => document.getElementById('resultado-parcial')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-        >
-          Ver resultado parcial
+        <button type="button" className="btn-primary w-full" onClick={onViewResults}>
+          {alreadyVoted && !done ? 'Ver resultado' : 'Acompanhar resultado'}
         </button>
-        <button type="button" className="btn-secondary w-full" onClick={onReset}>Voltar para o início</button>
       </aside>
     );
   }
@@ -374,29 +348,14 @@ function ConfirmationPanel({
           )}
         </div>
 
-        <label className="grid gap-2 text-sm font-semibold text-white/80">
-          <span>Código de votação</span>
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-white/45" />
-            <input
-              className="input pl-11 uppercase"
-              value={code}
-              onChange={(event) => onCodeChange(event.target.value)}
-              placeholder="FESTA-A7X92"
-              autoComplete="one-time-code"
-            />
-          </div>
-        </label>
-
         {error && <p className="rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-100">{error}</p>}
 
-        <button className="btn-primary min-h-14 w-full text-base" disabled={!selected || submitting} type="submit">
+        <button className="btn-primary min-h-14 w-full text-base" disabled={!selected || submitting || alreadyVoted} type="submit">
           <Vote className="h-5 w-5" />
           {submitting ? 'Registrando voto...' : 'Confirmar voto'}
         </button>
 
         {!selected && <p className="text-center text-xs font-semibold uppercase text-white/45">Escolha uma fantasia para continuar.</p>}
-        {selected && !normalizedCode && <p className="text-center text-xs font-semibold uppercase text-white/45">Informe o código antes de confirmar.</p>}
         {status.status === 'TEST' && <p className="rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-center text-xs font-bold uppercase text-amber-100">Votação em modo de teste</p>}
       </form>
     </aside>
@@ -420,7 +379,7 @@ function descriptionForStatus(status: VotingStatus | null) {
   return ({
     TEST: 'Teste a votação antes do evento. Os votos daqui ficam separados da votação oficial.',
     WAITING: 'O QR já pode ser usado. A votação abre automaticamente no horário configurado.',
-    OPEN: 'Escolha sua fantasia favorita, informe seu código e confirme o voto.',
+    OPEN: 'Escolha sua fantasia favorita e confirme o voto.',
     CLOSED: 'A votação foi encerrada.',
     RESULT_PENDING: 'A votação foi encerrada. O resultado final será liberado no horário configurado.',
     RESULT_PUBLISHED: 'Confira o ranking oficial divulgado pela organização.',

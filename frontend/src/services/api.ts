@@ -7,6 +7,7 @@ export const isApiConfigured = true;
 
 export const api = axios.create({
   baseURL,
+  withCredentials: true,
 });
 
 function normalizeApiBaseUrl(value?: string) {

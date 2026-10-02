@@ -52,7 +52,9 @@ async function ensureSchema() {
         CREATE TABLE IF NOT EXISTS votes (
           id BIGSERIAL PRIMARY KEY,
           participant_id BIGINT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
-          vote_code_id BIGINT NOT NULL REFERENCES vote_codes(id) ON DELETE RESTRICT,
+          vote_code_id BIGINT REFERENCES vote_codes(id) ON DELETE RESTRICT,
+          voter_id UUID,
+          is_test_vote BOOLEAN NOT NULL DEFAULT FALSE,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
         );
         CREATE TABLE IF NOT EXISTS event_settings (
@@ -79,15 +81,19 @@ async function ensureSchema() {
         ALTER TABLE participants ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS voting_status VARCHAR(20) NOT NULL DEFAULT 'DRAFT';
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_public_results BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS event_date DATE;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS timezone VARCHAR(80) NOT NULL DEFAULT 'America/Sao_Paulo';
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS voting_end_time TIME;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS results_reveal_at TIMESTAMP WITH TIME ZONE;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS voting_test_mode BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_live_results BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE votes ADD COLUMN IF NOT EXISTS voter_id UUID;
         ALTER TABLE votes ADD COLUMN IF NOT EXISTS is_test_vote BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE votes ALTER COLUMN vote_code_id DROP NOT NULL;
         ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_vote_code_id_key;
         CREATE UNIQUE INDEX IF NOT EXISTS votes_vote_code_official_unique ON votes (vote_code_id) WHERE is_test_vote = FALSE;
         CREATE UNIQUE INDEX IF NOT EXISTS votes_vote_code_test_unique ON votes (vote_code_id) WHERE is_test_vote = TRUE;
+        CREATE UNIQUE INDEX IF NOT EXISTS votes_voter_context_unique ON votes (voter_id, is_test_vote) WHERE voter_id IS NOT NULL;
       `);
       await client.query(`
         INSERT INTO event_settings (
@@ -100,6 +106,11 @@ async function ensureSchema() {
           FALSE, 'DRAFT', FALSE, 'America/Sao_Paulo'
         )
         ON CONFLICT (id) DO NOTHING
+      `);
+      await client.query(`
+        UPDATE event_settings
+        SET event_date = DATE '2026-11-14'
+        WHERE id = 1 AND event_date IS DISTINCT FROM DATE '2026-11-14'
       `);
       await client.query(`
         UPDATE event_settings

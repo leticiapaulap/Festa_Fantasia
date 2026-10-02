@@ -3,6 +3,7 @@ const { json, httpError, readJson, sendError } = require('./http');
 const participants = require('./participants');
 const settings = require('./settings');
 const voting = require('./voting');
+const { ensureVoterId } = require('./voter');
 const results = require('./results');
 const admin = require('./admin');
 
@@ -22,12 +23,18 @@ module.exports = async function handler(req, res) {
       return json(res, await participants.createPublicParticipant(req), 201);
     }
     if (req.method === 'GET' && path === 'results') return json(res, await results.results(true));
-    if (req.method === 'GET' && path === 'voting/status') return json(res, await settings.votingStatus());
+    if (req.method === 'GET' && path === 'voting/status') {
+      const voterId = ensureVoterId(req, res);
+      const status = await settings.votingStatus();
+      status.hasVoted = await voting.hasVoted(voterId, status.status);
+      res.setHeader('Cache-Control', 'no-store');
+      return json(res, status);
+    }
     if (req.method === 'GET' && path === 'voting/live-results') return json(res, await results.liveResults());
     if (req.method === 'GET' && path === 'voting/results') return json(res, await results.finalResults());
-    if (req.method === 'POST' && path === 'votes') return json(res, await voting.vote(await readJson(req)));
-    if (req.method === 'POST' && path === 'vote-codes/validate') {
-      return json(res, await voting.validateCode(await readJson(req)));
+    if (req.method === 'POST' && path === 'votes') {
+      const voterId = ensureVoterId(req, res);
+      return json(res, await voting.vote(await readJson(req), voterId));
     }
 
     if (req.method === 'GET' && path === 'admin/bootstrap/status') return json(res, await admin.bootstrapStatus());
@@ -58,10 +65,6 @@ module.exports = async function handler(req, res) {
         }
         if (req.method === 'DELETE' && parts[1] === 'participants' && parts[2]) {
           return json(res, await participants.deleteParticipant(parts[2]));
-        }
-        if (req.method === 'GET' && path === 'admin/vote-codes') return json(res, await voting.voteCodes());
-        if (req.method === 'POST' && path === 'admin/vote-codes/generate') {
-          return json(res, await voting.generateCodes(await readJson(req)));
         }
         if (req.method === 'POST' && path === 'admin/voting/open') return json(res, await settings.setVoting(true));
         if (req.method === 'POST' && path === 'admin/voting/close') return json(res, await settings.setVoting(false));

@@ -1,20 +1,22 @@
 # Halloween — Concurso de Melhor Fantasia
 
-Sistema full stack para uma festa real: cadastro de fantasias, listagem pública, votação com códigos únicos, painel administrativo, QR Codes, encerramento da votação e resultado público com ranking e confetes.
+Sistema full stack para uma festa real: cadastro de fantasias, listagem pública, votação anônima por navegador, painel administrativo, QR Codes, encerramento da votação e resultado público com ranking e confetes.
 
 ## Tecnologias
 
-- Backend: Java 17+, Spring Boot, Spring Web, Spring Data JPA, Spring Security, JWT, BCrypt, Bean Validation, Flyway, Maven e PostgreSQL.
+- API usada pela Vercel: Node.js serverless, PostgreSQL via `pg`, JWT e BCrypt.
+- Módulo Java: Spring Boot, Spring Data JPA, Spring Security, Flyway e Maven.
 - Frontend: React, TypeScript, Vite, Tailwind CSS, React Router, Axios, React Hook Form, Zod, Lucide Icons, QR Code e canvas-confetti.
 - Banco: PostgreSQL persistente. Os dados ficam no banco e não desaparecem quando uma nova versão é publicada.
 
 ## Arquitetura
 
-- `backend/`: API REST, regras de negócio, autenticação admin, migrações e testes.
+- `backend/`: implementação Spring Boot mantida no repositório e migrations Flyway.
 - `frontend/`: aplicação pública e painel admin responsivo, mobile-first.
+- `api/` e `server/`: handler da API serverless implantada junto ao frontend na Vercel.
 - `docker-compose.yml`: PostgreSQL local com volume persistente.
 
-Principais tabelas criadas pelo Flyway:
+Principais tabelas:
 
 - `participants`
 - `vote_codes`
@@ -22,7 +24,7 @@ Principais tabelas criadas pelo Flyway:
 - `event_settings`
 - `admin_users`
 
-As regras críticas também existem no banco: `vote_codes.code` é `UNIQUE` e `votes.vote_code_id` é `UNIQUE`, impedindo dois votos para o mesmo código mesmo sob concorrência.
+O handler serverless usado pela Vercel gera um identificador aleatório e o guarda em cookie assinado `HttpOnly`. O banco impõe unicidade em `votes(voter_id, is_test_vote)`, separando votos de teste e oficiais. A migration Flyway `V2__anonymous_voter_votes.sql` adiciona essa estrutura sem apagar votos; as tabelas e colunas antigas de códigos são preservadas, mas não são usadas pelo fluxo atual.
 
 ## Variáveis de Ambiente
 
@@ -92,9 +94,9 @@ Depois disso, use login normal com e-mail e senha. As senhas são armazenadas co
 
 1. Organizador cria o admin.
 2. Participantes acessam `/cadastro` ou escaneiam o QR Code de cadastro.
-3. Admin gera códigos no painel.
-4. Convidados acessam `/votar` ou `/votar?codigo=FESTA-XXXXX`.
-5. Backend valida código, votação aberta e duplicidade em transação.
+3. Convidados acessam `/votar`; a API cria um identificador anônimo para o navegador.
+4. A pessoa escolhe uma fantasia e confirma o voto; o backend valida o participante e o estado da votação.
+5. Votos de teste ficam separados dos oficiais. Desativar o modo de teste permite que o mesmo navegador vote uma vez na votação oficial.
 6. Admin encerra a votação.
 7. Público acessa `/resultado`.
 
@@ -119,8 +121,8 @@ Frontend:
 API serverless da Vercel:
 
 - `api/[...path].js` é o único arquivo de endpoint dentro de `api/` e encaminha as rotas para `server/api-handler.js`. O roteador delega para módulos server-side separados: `database.js`, `http.js`, `settings.js`, `participants.js`, `voting.js`, `results.js` e `admin.js`. Eles ficam fora da pasta que a Vercel trata como Functions.
-- Os caminhos existentes (`/api/settings`, `/api/participants`, `/api/admin/*`, `/api/votes` e `/api/results`) continuam disponíveis pela mesma Function. Isso mantém o deployment dentro do limite do plano Hobby.
-- Configure `DATABASE_URL` e `ADMIN_REGISTRATION_CODE` nas variáveis server-side da Vercel. O backend usa `pg` e PostgreSQL (incluindo Neon); não usa Prisma. `VITE_API_URL` não é necessária para chamadas same-origin.
+- Os caminhos (`/api/settings`, `/api/participants`, `/api/voting/status`, `/api/voting/live-results`, `/api/admin/*`, `/api/votes` e `/api/results`) continuam disponíveis pela mesma Function. Isso mantém o deployment dentro do limite do plano Hobby.
+- Configure `DATABASE_URL`, `ADMIN_REGISTRATION_CODE`, `JWT_SECRET` e `VOTER_COOKIE_SECRET` nas variáveis server-side da Vercel. `VOTER_COOKIE_SECRET` deve ter pelo menos 32 caracteres e permanecer estável entre deploys; se não estiver definida, o backend usa `JWT_SECRET`. Em produção, o cookie também recebe `Secure`. O backend usa `pg` e PostgreSQL (incluindo Neon); não usa Prisma. `VITE_API_URL` não é necessária para chamadas same-origin.
 - `POST /api/admin/register` exige `ADMIN_REGISTRATION_CODE` e permite registrar outra conta; `POST /api/admin/login` requer somente e-mail e senha. O endpoint legado `/api/admin/bootstrap` continua restrito à criação inicial.
 
 Banco:
@@ -134,11 +136,10 @@ A aplicação salva `photoUrl` no banco e não grava arquivos dentro do projeto.
 
 ## Testes e Build
 
-Backend:
+API serverless:
 
 ```bash
-cd backend
-./mvnw test
+npm test
 ```
 
 Frontend:
@@ -148,14 +149,7 @@ cd frontend
 npm run build
 ```
 
-Cobertura backend criada para regras críticas:
-
-- Código válido consegue votar.
-- Código inválido não vota.
-- Código utilizado não vota novamente.
-- Duas requisições simultâneas com o mesmo código geram só um voto.
-- Votação encerrada rejeita votos.
-- Resultado soma votos e identifica empate.
+Os testes da API verificam a assinatura/flags do cookie, voto duplicado concorrente, isolamento teste/oficial e participante inativo. O build do frontend também executa o TypeScript. O módulo Spring Boot é uma implementação separada no repositório; os testes dele podem ser executados com JDK 17 usando `cd backend; .\mvnw.cmd test` no Windows.
 
 ## Dados de Desenvolvimento
 

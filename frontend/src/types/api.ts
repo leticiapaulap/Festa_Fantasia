@@ -63,6 +63,7 @@ export type Results = {
 export type VotingStatus = {
   status: VotingState;
   serverTime: string;
+  hasVoted: boolean;
   votingStartsAt?: string | null;
   votingEndsAt?: string | null;
   resultsRevealAt?: string | null;
@@ -75,19 +76,10 @@ export type Dashboard = {
   participants: number;
   votes: number;
   testVotes: number;
-  availableCodes: number;
-  usedCodes: number;
+  totalVotes: number;
   status: string;
   settings: EventSettings;
   results: Results;
-};
-
-export type VoteCode = {
-  id: number;
-  code: string;
-  used: boolean;
-  createdAt: string;
-  usedAt?: string;
 };
 
 export type LoginResponse = {
@@ -98,12 +90,4 @@ export type LoginResponse = {
 
 export type BootstrapStatus = {
   available: boolean;
-};
-
-export type VoteListItem = {
-  id: number;
-  participantName: string;
-  costumeName: string;
-  code: string;
-  createdAt: string;
 };

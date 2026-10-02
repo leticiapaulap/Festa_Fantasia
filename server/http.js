@@ -99,13 +99,8 @@ function iso(value) {
   return value ? new Date(value).toISOString() : null;
 }
 
-function cryptoRandom() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-}
-
 module.exports = {
   clean,
-  cryptoRandom,
   dateOnly,
   httpError,
   iso,

@@ -8,19 +8,16 @@ const { clean, httpError, normalizeCode, normalizeEmail } = require('./http');
 async function dashboard() {
   const settings = await getSettings();
   const eventResults = await results(false);
-  const [participants, votes, testVotes, availableCodes, usedCodes] = await Promise.all([
+  const [participants, votes, testVotes] = await Promise.all([
     scalar('SELECT COUNT(*)::int AS total FROM participants'),
     scalar('SELECT COUNT(*)::int AS total FROM votes WHERE is_test_vote=FALSE'),
     scalar('SELECT COUNT(*)::int AS total FROM votes WHERE is_test_vote=TRUE'),
-    scalar('SELECT COUNT(*)::int AS total FROM vote_codes WHERE used=FALSE'),
-    scalar('SELECT COUNT(*)::int AS total FROM vote_codes WHERE used=TRUE'),
   ]);
   return {
     participants,
     votes,
     testVotes,
-    availableCodes,
-    usedCodes,
+    totalVotes: votes + testVotes,
     status: settings.canAcceptVotes ? 'VOTAÇÃO ABERTA' : settings.votingAvailability,
     settings,
     results: eventResults,
@@ -29,7 +26,7 @@ async function dashboard() {
 
 async function resetVotes(input) {
   if (input.confirmation !== 'RESETAR VOTOS') throw httpError(400, 'Confirmação inválida.');
-  await getPool().query('DELETE FROM votes WHERE is_test_vote=FALSE; UPDATE vote_codes SET used=FALSE, used_at=NULL;');
+  await getPool().query('DELETE FROM votes WHERE is_test_vote=FALSE;');
   return {};
 }
 
