@@ -80,7 +80,7 @@ export function AdminDashboardPage() {
   }
 
   async function removeParticipant(id: number) {
-    if (!window.confirm('Excluir este participante?')) return;
+    if (!window.confirm('Deseja realmente excluir este participante?')) return;
     try {
       await api.delete(`/admin/participants/${id}`);
       toast.success('Participante excluído.');
@@ -311,10 +311,10 @@ function Metric({
     <article className={`metric-card metric-${tone} min-w-0 rounded-xl border p-4 sm:p-5`}>
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4 shrink-0 text-ember" />
-        <p className="truncate text-xs font-bold uppercase tracking-wide text-white/60">{label}</p>
+        <p className="truncate text-[13px] font-bold uppercase tracking-wide text-white/70">{label}</p>
       </div>
       <p className="mt-4 truncate text-[28px] font-extrabold leading-none text-white sm:text-[32px]" title={String(value)}>{value}</p>
-      <p className="mt-2 truncate text-xs text-white/50">{caption}</p>
+      <p className="mt-2 truncate text-[13px] text-white/60">{caption}</p>
     </article>
   );
 }
@@ -500,9 +500,9 @@ function ParticipantsAdmin({
         <button className="btn-primary" onClick={onCreate}><Plus className="h-4 w-4" /> Cadastrar participante</button>
       </div>
       {participants.map((participant) => (
-        <div key={participant.id} className="halloween-card flex flex-col gap-4 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-          <div className="flex min-w-0 gap-4">
-            <div className="participant-photo-frame h-28 w-24 shrink-0 rounded-xl">
+        <div key={participant.id} className="halloween-card flex flex-col gap-4 rounded-xl p-3 transition-colors duration-200 hover:border-white/20 hover:bg-white/[0.02] sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <div className="flex min-w-0 gap-3 sm:gap-4">
+            <div className="participant-photo-frame h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl sm:h-24 sm:w-24">
               {participant.photoUrl ? (
                 <img src={participant.photoUrl} alt={participant.costumeName} className="h-full w-full object-cover" />
               ) : (
@@ -512,17 +512,17 @@ function ParticipantsAdmin({
               )}
             </div>
             <div className="min-w-0 self-center">
-              <span className={`participant-status ${participant.active ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-100' : 'border-white/12 bg-white/8 text-white/55'}`}>
-                {participant.active ? 'Pronto para votação' : 'Inativo'}
+              <p className="truncate text-[15px] font-bold text-white sm:text-base">{participant.name}</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-ember sm:text-[15px]">{participant.costumeName}</p>
+              <p className="mt-1 text-[12px] text-white/60">{participant.photoUrl ? 'Foto cadastrada' : 'Sem foto'}</p>
+              <span className={`participant-status mt-2 px-2 py-1 text-[10px] ${participant.active ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-100' : 'border-white/12 bg-white/8 text-white/65'}`}>
+                {participant.active ? 'Ativo' : 'Inativo'}
               </span>
-              <p className="mt-3 truncate font-bold text-white">{participant.name}</p>
-              <p className="truncate text-ember">{participant.costumeName}</p>
-              <p className="text-sm text-white/50">{participant.photoUrl ? 'Foto cadastrada' : 'Sem foto'}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
-            <button className="btn-secondary" onClick={() => onEdit(participant)}><Edit3 className="h-4 w-4" /> Editar</button>
-            <button className="btn-secondary" onClick={() => onDelete(participant.id)}><Trash2 className="h-4 w-4" /> Excluir</button>
+            <button className="btn-secondary min-h-10 min-w-0 flex-1 px-3 py-2 text-xs sm:flex-none" onClick={() => onEdit(participant)}><Edit3 className="h-4 w-4" /> Editar</button>
+            <button className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[0.04] px-3 py-2 text-xs font-bold uppercase text-rose-100/80 transition hover:border-rose-300/35 hover:bg-rose-400/10 sm:flex-none" onClick={() => onDelete(participant.id)}><Trash2 className="h-4 w-4" /> Excluir</button>
           </div>
         </div>
       ))}
