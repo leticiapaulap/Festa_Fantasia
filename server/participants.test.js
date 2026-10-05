@@ -95,6 +95,11 @@ test('public participant POST uploads the photo, saves its URL, and returns the 
     'database insert starting',
     'database insert success',
   ]);
+  const blobSuccess = logEntries
+    .map(([, entry]) => JSON.parse(entry))
+    .find((entry) => entry.stage === 'blob upload success');
+  assert.equal(blobSuccess.hasUrl, true);
+  assert.match(blobSuccess.pathname, /^participants\/[0-9a-f-]{36}\.jpg$/);
 });
 
 test('database failures after upload are logged and return a registration error', async (t) => {

@@ -37,9 +37,7 @@ async function createPublicParticipant(req) {
     logParticipantStage('photo validation ok', 'success');
 
     stage = 'blob upload';
-    logParticipantStage('blob upload starting', 'started');
     const photoUrl = await uploadPhoto(photo);
-    logParticipantStage('blob upload success', 'success');
 
     stage = 'database insert';
     logParticipantStage('database insert starting', 'started');
@@ -134,6 +132,7 @@ async function uploadPhoto(file) {
   validatePhoto(file);
   const extension = file.mimeType === 'image/png' ? '.png' : file.mimeType === 'image/webp' ? '.webp' : '.jpg';
   const pathname = `participants/${randomUUID()}${extension}`;
+  logParticipantStage('blob upload starting', 'started', null, { pathname });
   try {
     const blob = await put(pathname, file.buffer, {
       access: 'public',
@@ -142,6 +141,10 @@ async function uploadPhoto(file) {
     if (typeof blob.url !== 'string' || !blob.url) {
       throw new Error('Blob upload completed without returning a URL.');
     }
+    logParticipantStage('blob upload success', 'success', null, {
+      hasUrl: Boolean(blob.url),
+      pathname: blob.pathname || pathname,
+    });
     return blob.url;
   } catch (error) {
     logParticipantStage('blob upload', 'failed', error);
@@ -229,18 +232,23 @@ function participantDatabaseError(error) {
   }
 }
 
-function logParticipantStage(stage, result, error) {
+function logParticipantStage(stage, result, error, details = {}) {
   const message = {
     endpoint: '/api/participants',
     method: 'POST',
     stage,
     result,
+    ...details,
   };
   if (error) {
     message.errorType = error.name || 'Error';
     if (typeof error.code === 'string') message.errorCode = error.code;
     if (typeof error.status === 'number') message.status = error.status;
+    else if (typeof error.statusCode === 'number') message.status = error.statusCode;
     if (typeof error.message === 'string') message.errorMessage = redactSensitiveValues(error.message);
+    if (typeof error.cause?.message === 'string') {
+      message.causeMessage = redactSensitiveValues(error.cause.message);
+    }
     console.error(`[participants] ${stage}`, JSON.stringify(message));
     return;
   }
