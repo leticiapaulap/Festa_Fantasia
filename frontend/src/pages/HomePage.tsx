@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CalendarClock, Copy, ExternalLink, LockKeyhole, QrCode, Trophy, Users, Vote } from 'lucide-react';
+import { CalendarClock, Copy, ExternalLink, QrCode, Trophy, Users, Vote } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
 import { eventPhase, formatEventDate } from '../services/eventPhase';
@@ -134,12 +134,6 @@ export function HomePage() {
         )}
       </aside>
 
-      <footer className="lg:col-span-2">
-        <Link to="/admin" className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-white/65 underline-offset-4 transition hover:bg-white/10 hover:text-white">
-          <LockKeyhole className="h-4 w-4" />
-          Área administrativa
-        </Link>
-      </footer>
     </section>
   );
 }
