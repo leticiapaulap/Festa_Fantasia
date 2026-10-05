@@ -128,7 +128,6 @@ export function HomePage() {
                 target={VOTING_RELEASE_AT}
                 tick={tick}
                 label="A votação abre em"
-                detail="00h na virada de 14 para 15/11 · Horário de Brasília"
               />
             )}
           </div>
@@ -215,7 +214,7 @@ function LockedVotingPanel() {
   );
 }
 
-function CountdownPanel({ target, tick, label, detail }: { target: string | Date; tick: number; label: string; detail?: string }) {
+function CountdownPanel({ target, tick, label }: { target: string | Date; tick: number; label: string }) {
   const remaining = Math.max(0, new Date(target).getTime() - tick);
   const totalSeconds = Math.floor(remaining / 1000);
   const days = Math.floor(totalSeconds / 86400);
@@ -231,7 +230,6 @@ function CountdownPanel({ target, tick, label, detail }: { target: string | Date
         <CountdownBox value={minutes} label="Min" />
         <CountdownBox value={seconds} label="Seg" />
       </div>
-      {detail && <p className="mt-2 text-[10px] font-semibold text-white/50">{detail}</p>}
     </div>
   );
 }
