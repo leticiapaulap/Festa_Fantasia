@@ -14,8 +14,8 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    linear-gradient(90deg, rgba(5, 3, 12, 0.82) 0%, rgba(5, 3, 12, 0.62) 43%, rgba(5, 3, 12, 0.36) 100%),
-    linear-gradient(180deg, rgba(11, 7, 18, 0.18), rgba(11, 7, 18, 0.64)),
+    linear-gradient(90deg, rgba(5, 3, 12, 0.48) 0%, rgba(5, 3, 12, 0.34) 43%, rgba(5, 3, 12, 0.1) 100%),
+    linear-gradient(180deg, rgba(11, 7, 18, 0.1), rgba(11, 7, 18, 0.3)),
     radial-gradient(circle at top left, rgba(109, 40, 217, 0.16), transparent 34rem),
     radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.18), transparent 28rem),
     url('/assets/halloween-background-cinematic.png') center center / cover fixed,
@@ -27,7 +27,7 @@ body {
 @media (max-width: 768px) {
   body {
     background:
-      linear-gradient(180deg, rgba(5, 3, 12, 0.58), rgba(5, 3, 12, 0.78)),
+      linear-gradient(180deg, rgba(5, 3, 12, 0.3), rgba(5, 3, 12, 0.5)),
       radial-gradient(circle at top left, rgba(109, 40, 217, 0.12), transparent 24rem),
       radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.14), transparent 20rem),
       url('/assets/halloween-background-cinematic.png') 66% center / cover fixed,
