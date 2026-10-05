@@ -119,15 +119,19 @@ export function VotePage() {
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-6 px-0 py-6">
+    <section className={`mx-auto grid w-full max-w-7xl px-0 ${status?.status === 'WAITING' ? 'gap-4 py-4 sm:gap-4 sm:py-5' : 'gap-6 py-6'}`}>
       <BackHomeLink />
 
-      <header className="halloween-card rounded-xl p-5 sm:p-6 lg:p-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
+      <header className={`halloween-card rounded-xl ${status?.status === 'WAITING' ? 'p-5 sm:px-7 sm:py-6 lg:p-8' : 'p-5 sm:p-6 lg:p-7'}`}>
+        <div className={`flex flex-col lg:flex-row lg:items-end lg:justify-between ${status?.status === 'WAITING' ? 'gap-3' : 'gap-5'}`}>
+          <div className={status?.status === 'WAITING' ? 'max-w-4xl' : 'max-w-3xl'}>
             <p className="text-sm font-black uppercase tracking-normal text-ember">Halloween</p>
-            <h1 className="mt-2 text-4xl font-black uppercase leading-tight text-white sm:text-5xl">{headingForStatus(status)}</h1>
-            <p className="mt-3 text-base leading-7 text-white/72 sm:text-lg">{descriptionForStatus(status)}</p>
+            <h1 className={`font-black uppercase text-white ${status?.status === 'WAITING' ? 'mt-1 text-[1.625rem] leading-[1.08] sm:text-[1.875rem] md:text-[2rem] lg:text-[2.25rem]' : 'mt-2 text-4xl leading-tight sm:text-5xl'}`}>
+              {headingForStatus(status)}
+            </h1>
+            <p className={`${status?.status === 'WAITING' ? 'mt-2 text-sm leading-5 sm:text-base sm:leading-6' : 'mt-3 text-base leading-7 sm:text-lg'} text-white/72`}>
+              {descriptionForStatus(status)}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {status?.status === 'TEST' && <Badge tone="test">Modo teste</Badge>}
@@ -142,13 +146,17 @@ export function VotePage() {
       {loading && <SkeletonGrid />}
 
       {!loading && status?.status === 'WAITING' && (
-        <StatusCard
-          title="A votação ainda não começou."
-          text="A votação será liberada automaticamente no horário configurado pela organização."
-          target={status.votingStartsAt}
-          tick={tick}
-          countdownLabel="Votação começa em"
-        />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start">
+          <StatusCard
+            compact
+            title="A votação ainda não começou."
+            text="A votação será liberada automaticamente no horário configurado pela organização."
+            target={status.votingStartsAt}
+            tick={tick}
+            countdownLabel="Votação começa em"
+          />
+          <ParticipantsAccessCard compact />
+        </div>
       )}
 
       {!loading && status?.status === 'RESULT_PENDING' && (
@@ -219,14 +227,33 @@ export function VotePage() {
         </>
       )}
 
-      {status?.status !== 'RESULT_PUBLISHED' && (
-        <div className="halloween-card mx-auto w-full max-w-2xl rounded-xl p-5 text-center">
-          <Users className="mx-auto h-8 w-8 text-ember" />
-          <p className="mt-2 text-white/75">Participantes já cadastrados</p>
-          <Link className="btn-secondary mt-4" to="/participantes">Ver participantes</Link>
-        </div>
-      )}
+      {status?.status !== 'RESULT_PUBLISHED' && status?.status !== 'WAITING' && <ParticipantsAccessCard />}
     </section>
+  );
+}
+
+function ParticipantsAccessCard({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="halloween-card flex flex-col justify-between gap-3 rounded-xl p-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 items-start gap-3">
+          <Users className="mt-0.5 h-6 w-6 shrink-0 text-ember" />
+          <div className="min-w-0">
+            <p className="font-bold text-white">Participantes cadastrados</p>
+            <p className="mt-1 text-sm leading-5 text-white/65">Confira quem já está participando.</p>
+          </div>
+        </div>
+        <Link className="btn-secondary min-h-10 shrink-0 px-3 py-2 text-xs" to="/participantes">Ver todos</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="halloween-card mx-auto w-full max-w-2xl rounded-xl p-5 text-center">
+      <Users className="mx-auto h-8 w-8 text-ember" />
+      <p className="mt-2 text-white/75">Participantes já cadastrados</p>
+      <Link className="btn-secondary mt-4" to="/participantes">Ver participantes</Link>
+    </div>
   );
 }
 
@@ -404,20 +431,20 @@ function countdownTarget(status: VotingStatus | null) {
   return null;
 }
 
-function StatusCard({ title, text, target, tick, countdownLabel }: { title: string; text: string; target?: string | null; tick: number; countdownLabel: string }) {
+function StatusCard({ title, text, target, tick, countdownLabel, compact = false }: { title: string; text: string; target?: string | null; tick: number; countdownLabel: string; compact?: boolean }) {
   return (
-    <div className="glass mx-auto grid w-full max-w-3xl gap-5 rounded-lg p-6 text-center">
-      <Clock3 className="mx-auto h-10 w-10 text-ember" />
+    <div className={`glass mx-auto grid w-full rounded-lg text-center ${compact ? 'max-w-none gap-4 p-5 sm:p-6' : 'max-w-3xl gap-5 p-6'}`}>
+      <Clock3 className={`mx-auto text-ember ${compact ? 'h-8 w-8' : 'h-10 w-10'}`} />
       <div>
-        <h2 className="text-3xl font-black text-white">{title}</h2>
-        <p className="mt-2 text-white/70">{text}</p>
+        <h2 className={`font-black text-white ${compact ? 'text-xl sm:text-2xl' : 'text-3xl'}`}>{title}</h2>
+        <p className={`text-white/70 ${compact ? 'mt-1 text-sm leading-5' : 'mt-2'}`}>{text}</p>
       </div>
-      {target && <Countdown target={target} tick={tick} label={countdownLabel} />}
+      {target && <Countdown target={target} tick={tick} label={countdownLabel} compact={compact} />}
     </div>
   );
 }
 
-function Countdown({ target, tick, label }: { target: string; tick: number; label: string }) {
+function Countdown({ target, tick, label, compact = false }: { target: string; tick: number; label: string; compact?: boolean }) {
   const remaining = Math.max(0, new Date(target).getTime() - tick);
   const totalSeconds = Math.floor(remaining / 1000);
   const days = Math.floor(totalSeconds / 86400);
@@ -426,21 +453,21 @@ function Countdown({ target, tick, label }: { target: string; tick: number; labe
   const seconds = totalSeconds % 60;
   return (
     <div>
-      <p className="mb-3 text-sm font-black uppercase text-ember">{label}</p>
+      <p className={`font-black uppercase text-ember ${compact ? 'mb-2 text-xs sm:text-sm' : 'mb-3 text-sm'}`}>{label}</p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <TimeBox value={days} label="Dias" />
-        <TimeBox value={hours} label="Horas" />
-        <TimeBox value={minutes} label="Min" />
-        <TimeBox value={seconds} label="Seg" />
+        <TimeBox value={days} label="Dias" compact={compact} />
+        <TimeBox value={hours} label="Horas" compact={compact} />
+        <TimeBox value={minutes} label="Min" compact={compact} />
+        <TimeBox value={seconds} label="Seg" compact={compact} />
       </div>
     </div>
   );
 }
 
-function TimeBox({ value, label }: { value: number; label: string }) {
+function TimeBox({ value, label, compact = false }: { value: number; label: string; compact?: boolean }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-      <p className="text-3xl font-black text-white tabular-nums">{String(value).padStart(2, '0')}</p>
+    <div className={`rounded-lg border border-white/10 bg-black/25 ${compact ? 'p-2 sm:p-2.5' : 'p-3'}`}>
+      <p className={`font-black text-white tabular-nums ${compact ? 'text-2xl sm:text-3xl' : 'text-3xl'}`}>{String(value).padStart(2, '0')}</p>
       <p className="text-xs font-bold uppercase text-white/55">{label}</p>
     </div>
   );
