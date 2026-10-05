@@ -121,7 +121,7 @@ export function HomePage() {
           <StatusPanel title="VOTAÇÃO" text="A votação foi encerrada. Obrigado por participar." />
         )}
         {phase && phase !== 'FINISHED' && (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className={`mt-5 grid gap-3 ${partyStartsAt && !votingAvailable ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
             {partyStartsAt && <CountdownPanel target={partyStartsAt} tick={tick} label="A festa começa em" />}
             {!votingAvailable && (
               <CountdownPanel
@@ -223,7 +223,7 @@ function CountdownPanel({ target, tick, label, detail }: { target: string | Date
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return (
-    <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-center">
+    <div className="w-full rounded-lg border border-white/10 bg-black/25 p-3 text-center sm:p-4">
       <p className="mb-2 text-xs font-black uppercase text-ember">{label}</p>
       <div className="grid grid-cols-4 gap-2">
         <CountdownBox value={days} label="Dias" />
