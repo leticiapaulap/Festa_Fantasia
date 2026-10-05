@@ -196,9 +196,6 @@ function LockedVotingPanel({ startsAt, tick, showCountdown }: { startsAt?: strin
         </p>
       </div>
       {showCountdown && startsAt && <VoteCountdown target={startsAt} tick={tick} />}
-      <p className="rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm font-semibold text-white/62">
-        Quando chegar o horário configurado pela organização, o acesso à votação ficará disponível aqui.
-      </p>
     </div>
   );
 }
