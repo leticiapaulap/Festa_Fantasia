@@ -124,6 +124,7 @@ API serverless da Vercel:
 - Os caminhos (`/api/settings`, `/api/participants`, `/api/voting/status`, `/api/voting/live-results`, `/api/admin/*`, `/api/votes` e `/api/results`) continuam disponíveis pela mesma Function. Isso mantém o deployment dentro do limite do plano Hobby.
 - Configure `DATABASE_URL`, `ADMIN_REGISTRATION_CODE`, `JWT_SECRET`, `VOTER_COOKIE_SECRET` e `IP_HASH_SECRET` nas variáveis server-side da Vercel. `VOTER_COOKIE_SECRET` deve ter pelo menos 32 caracteres e permanecer estável entre deploys; se não estiver definida, o backend usa `JWT_SECRET`. `IP_HASH_SECRET` deve ser server-side e estável para gerar o hash de IP sem salvar o IP bruto. Em produção, o cookie também recebe `Secure`. O backend usa `pg` e PostgreSQL (incluindo Neon); não usa Prisma. `VITE_API_URL` não é necessária para chamadas same-origin.
 - `POST /api/admin/register` exige `ADMIN_REGISTRATION_CODE` e permite registrar outra conta; `POST /api/admin/login` requer somente e-mail e senha. O endpoint legado `/api/admin/bootstrap` continua restrito à criação inicial.
+- O cadastro público de participantes envia as fotos para o Vercel Blob. Conecte o Blob Store ao projeto Vercel correto e habilite OIDC para o ambiente Production. `@vercel/blob` usa a credencial OIDC e o `BLOB_STORE_ID` fornecidos pela Vercel automaticamente; não passe um token manual para `put`. `BLOB_READ_WRITE_TOKEN` é alternativa quando OIDC não estiver disponível.
 
 Banco:
 
@@ -132,7 +133,7 @@ Banco:
 
 ## Upload de Fotos
 
-A aplicação salva `photoUrl` no banco e não grava arquivos dentro do projeto. O storage configurado neste projeto é Cloudinary via upload preset; o usuário escolhe um arquivo e o backend grava somente a URL segura retornada.
+O cadastro público da API serverless valida JPG, PNG e WEBP de até 5 MB, envia a foto ao Vercel Blob e salva somente a URL pública retornada em `photo_url` no Neon. O pacote `@vercel/blob` está fixado em `2.8.0` no lockfile e dá suporte à autenticação OIDC da Vercel sem token manual. A implementação Spring Boot separada usa Cloudinary e suas variáveis `CLOUDINARY_*`; elas não são usadas pelo fluxo serverless do frontend.
 
 ## Testes e Build
 

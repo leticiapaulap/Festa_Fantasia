@@ -1,8 +1,9 @@
 const Busboy = require('busboy');
 const { put } = require('@vercel/blob');
+const { randomUUID } = require('node:crypto');
 const { getPool } = require('./database');
-const { canAcceptVotes, getSettingsEntity } = require('./settings');
-const { clean, cryptoRandom, httpError, iso, parseBool, requireText } = require('./http');
+const { getSettingsEntity } = require('./settings');
+const { clean, httpError, iso, parseBool, requireText } = require('./http');
 
 async function listParticipants(activeOnly) {
   const { rows } = await getPool().query(
@@ -18,28 +19,30 @@ async function getParticipant(id) {
 }
 
 async function createPublicParticipant(req) {
+  logParticipantStage('request received', 'started');
   let stage = 'registration check';
   try {
     const settings = await getSettingsEntity();
     if (!settings.registration_open) throw httpError(409, 'O período de cadastro foi encerrado.');
-    logParticipantCreate(stage, 'ok');
 
-    stage = 'multipart parsing';
+    stage = 'formData parsing';
     const { fields, files } = await parseMultipart(req);
-    logParticipantCreate(stage, 'ok');
+    logParticipantStage('formData parsed', 'success');
 
-    stage = 'validation';
+    stage = 'photo validation';
     const name = requireText(fields.name, 'Informe o nome do participante.');
     const costumeName = requireText(fields.costumeName, 'Informe o nome da fantasia.');
     const photo = files.photo;
-    if (!photo) throw httpError(400, 'Selecione uma imagem para upload.');
-    logParticipantCreate(stage, 'ok');
+    validatePhoto(photo);
+    logParticipantStage('photo validation ok', 'success');
 
-    stage = 'photo upload';
+    stage = 'blob upload';
+    logParticipantStage('blob upload starting', 'started');
     const photoUrl = await uploadPhoto(photo);
-    logParticipantCreate(stage, 'ok');
+    logParticipantStage('blob upload success', 'success');
 
     stage = 'database insert';
+    logParticipantStage('database insert starting', 'started');
     const participant = await insertParticipant({
       name,
       costumeName,
@@ -47,10 +50,10 @@ async function createPublicParticipant(req) {
       photoUrl,
       active: true,
     });
-    logParticipantCreate(stage, 'ok');
+    logParticipantStage('database insert success', 'success');
     return { success: true, participant };
   } catch (error) {
-    logParticipantCreate(stage, 'failed', error);
+    logParticipantStage(stage, 'failed', error);
     throw error;
   }
 }
@@ -76,16 +79,7 @@ async function insertParticipant(input) {
     `, [input.name, input.costumeName, input.description, input.photoUrl, input.active]);
     return participantResponse(rows[0]);
   } catch (error) {
-    if (typeof error.code === 'string') {
-      console.error('[participants:create]', JSON.stringify({
-        endpoint: '/api/participants',
-        method: 'POST',
-        stage: 'database insert',
-        result: 'failed',
-        errorType: error.name || 'Error',
-        errorCode: error.code,
-      }));
-    }
+    logParticipantStage('database insert', 'failed', error);
     throw participantDatabaseError(error);
   }
 }
@@ -137,25 +131,31 @@ function participantResponse(row) {
 }
 
 async function uploadPhoto(file) {
-  const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
-  if (!allowed.has(file.mimeType)) throw httpError(400, 'Selecione uma imagem JPG, PNG ou WEBP.');
-  if (file.buffer.length > 5 * 1024 * 1024) throw httpError(400, 'A imagem deve ter no máximo 5 MB.');
+  validatePhoto(file);
   const extension = file.mimeType === 'image/png' ? '.png' : file.mimeType === 'image/webp' ? '.webp' : '.jpg';
-  const pathname = `participants/${cryptoRandom()}${extension}`;
+  const pathname = `participants/${randomUUID()}${extension}`;
   try {
     const blob = await put(pathname, file.buffer, {
       access: 'public',
       contentType: file.mimeType,
     });
     if (typeof blob.url !== 'string' || !blob.url) {
-      throw httpError(422, 'Não foi possível enviar a foto. Verifique o arquivo e a configuração do armazenamento.');
+      throw new Error('Blob upload completed without returning a URL.');
     }
     return blob.url;
   } catch (error) {
-    if (error.status) throw error;
-    logParticipantCreate('photo upload request', 'failed', error);
-    throw httpError(502, 'Não foi possível enviar a foto. Tente novamente.');
+    logParticipantStage('blob upload', 'failed', error);
+    throw httpError(502, 'Não foi possível enviar a foto.');
   }
+}
+
+function validatePhoto(file) {
+  const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+    throw httpError(400, 'Selecione uma imagem para upload.');
+  }
+  if (!allowed.has(file.mimeType)) throw httpError(400, 'Selecione uma imagem JPG, PNG ou WEBP.');
+  if (file.buffer.length > 5 * 1024 * 1024) throw httpError(400, 'A imagem deve ter no máximo 5 MB.');
 }
 
 function parseMultipart(req) {
@@ -225,11 +225,11 @@ function participantDatabaseError(error) {
     case '08006':
       return httpError(503, 'Não foi possível conectar ao banco de dados. Verifique a configuração do servidor.');
     default:
-      return error;
+      return httpError(500, 'Não foi possível concluir o cadastro.');
   }
 }
 
-function logParticipantCreate(stage, result, error) {
+function logParticipantStage(stage, result, error) {
   const message = {
     endpoint: '/api/participants',
     method: 'POST',
@@ -240,11 +240,23 @@ function logParticipantCreate(stage, result, error) {
     message.errorType = error.name || 'Error';
     if (typeof error.code === 'string') message.errorCode = error.code;
     if (typeof error.status === 'number') message.status = error.status;
-    if (typeof error.stack === 'string') message.stack = error.stack.split('\n').slice(1);
-    console.error('[participants:create]', JSON.stringify(message));
+    if (typeof error.message === 'string') message.errorMessage = redactSensitiveValues(error.message);
+    console.error(`[participants] ${stage}`, JSON.stringify(message));
     return;
   }
-  console.info('[participants:create]', JSON.stringify(message));
+  console.info(`[participants] ${stage}`, JSON.stringify(message));
+}
+
+function redactSensitiveValues(value) {
+  let safeValue = value
+    .replace(/(postgres(?:ql)?:\/\/)[^\s"'<>]+/gi, '$1[REDACTED]')
+    .replace(/(bearer\s+)[^\s]+/gi, '$1[REDACTED]');
+  for (const [name, secret] of Object.entries(process.env)) {
+    if (/TOKEN|SECRET|PASSWORD|DATABASE_URL|CLOUDINARY/i.test(name) && secret && secret.length >= 4) {
+      safeValue = safeValue.split(secret).join('[REDACTED]');
+    }
+  }
+  return safeValue;
 }
 
 module.exports = {

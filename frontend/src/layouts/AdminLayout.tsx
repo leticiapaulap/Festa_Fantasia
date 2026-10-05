@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const { token } = useAuth();
-  if (!token) return <Navigate to="/admin" replace />;
+  if (!token) return <Navigate to="/admin?expired=1" replace />;
   return (
     <div className="relative min-h-screen px-4 py-5 sm:px-6 lg:px-8">
       <HalloweenDecor />

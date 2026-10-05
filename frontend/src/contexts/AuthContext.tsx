@@ -1,5 +1,5 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
-import { api } from '../services/api';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { ADMIN_SESSION_EXPIRED_EVENT, api } from '../services/api';
 import type { LoginResponse } from '../types/api';
 
 type AuthContextValue = {
@@ -13,6 +13,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState(() => localStorage.getItem('adminToken'));
+
+  useEffect(() => {
+    const expireSession = () => setToken(null);
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, expireSession);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, expireSession);
+  }, []);
 
   async function login(email: string, password: string) {
     const { data } = await api.post<LoginResponse>('/admin/login', { email, password });

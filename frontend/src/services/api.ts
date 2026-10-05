@@ -10,6 +10,8 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+export const ADMIN_SESSION_EXPIRED_EVENT = 'admin-session-expired';
+
 function normalizeApiBaseUrl(value?: string) {
   if (!value) return import.meta.env.DEV ? 'http://localhost:8080/api' : '/api';
   if (typeof window !== 'undefined' && value === window.location.origin) return '/api';
@@ -24,6 +26,23 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401 && isProtectedAdminRequest(error.config?.url)) {
+      localStorage.removeItem('adminToken');
+      window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED_EVENT));
+    }
+    return Promise.reject(error);
+  },
+);
+
+function isProtectedAdminRequest(url?: string) {
+  if (!url) return false;
+  const path = url.replace(/^\/api(?=\/)/, '');
+  return /^\/admin\/(?!login(?:\/|$)|bootstrap(?:\/|$)|register(?:\/|$))/.test(path);
+}
+
 export function apiMessage(error: unknown) {
   if (error instanceof Error && error.message === 'INVALID_SETTINGS_RESPONSE') {
     return 'Não foi possível carregar as configurações do evento.';
@@ -32,6 +51,9 @@ export function apiMessage(error: unknown) {
     return 'Não foi possível carregar os participantes.';
   }
   if (axios.isAxiosError(error)) {
+    if (error.response?.status === 401 && isProtectedAdminRequest(error.config?.url)) {
+      return 'Sua sessão expirou. Entre novamente.';
+    }
     if (!error.response) {
       return 'Não foi possível conectar à API. Verifique a URL pública do backend.';
     }

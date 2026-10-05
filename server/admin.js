@@ -125,16 +125,26 @@ function loginResponse(admin) {
 async function withAdmin(req, action) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!token) throw httpError(401, 'Autenticação administrativa necessária.');
+  if (!token) {
+    safeAdminAuthLog('missing bearer token');
+    throw httpError(401, 'Autenticação administrativa necessária.');
+  }
+
+  let payload;
   try {
-    const payload = jwt.verify(token, jwtSecret());
-    const count = await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [payload.sub]);
-    if (count < 1) throw httpError(401, 'Autenticação administrativa inválida.');
-    return await action();
+    payload = jwt.verify(token, jwtSecret());
   } catch (error) {
     if (error.status) throw error;
+    safeAdminAuthLog('invalid bearer token', { errorType: error.name || 'Error' });
     throw httpError(401, 'Autenticação administrativa inválida.');
   }
+
+  const count = await scalar('SELECT COUNT(*)::int AS total FROM admin_users WHERE LOWER(email)=LOWER($1)', [payload.sub]);
+  if (count < 1) {
+    safeAdminAuthLog('admin account not found');
+    throw httpError(401, 'Autenticação administrativa inválida.');
+  }
+  return action();
 }
 
 function jwtSecret() {
@@ -161,6 +171,10 @@ function safeLoginLog(stage, details = {}) {
     stage,
     ...details,
   }));
+}
+
+function safeAdminAuthLog(stage, details = {}) {
+  console.warn('[admin-auth]', JSON.stringify({ stage, ...details }));
 }
 
 module.exports = {

@@ -21,6 +21,7 @@ type FormData = z.infer<typeof schema>;
 export function AdminLoginPage() {
   const { token, login, bootstrap } = useAuth();
   const location = useLocation();
+  const sessionExpired = new URLSearchParams(location.search).get('expired') === '1';
   const [creating, setCreating] = useState(location.pathname === '/admin/register');
   const [bootstrapAvailable, setBootstrapAvailable] = useState(false);
   const navigate = useNavigate();
@@ -62,6 +63,11 @@ export function AdminLoginPage() {
           <h1 className="text-2xl font-black text-white">{creating ? 'Halloween — Criar conta administrativa' : 'Halloween — Painel Administrativo'}</h1>
           <p className="text-sm text-white/60">{creating ? 'Este acesso é restrito à organização.' : 'Entre para controlar votação, códigos e resultado.'}</p>
         </div>
+        {sessionExpired && !creating && (
+          <p role="alert" className="mb-4 rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-100">
+            Sua sessão expirou. Entre novamente.
+          </p>
+        )}
         {creating && (
           <label className="mb-4 grid gap-2 text-sm text-white/78">
             Nome
