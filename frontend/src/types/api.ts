@@ -24,11 +24,11 @@ export type EventSettings = {
   showPublicResults: boolean;
   showLiveResults: boolean;
   votingTestMode: boolean;
-  votingStart?: string;
-  votingEnd?: string;
-  votingStartsAt?: string;
-  votingEndsAt?: string;
-  resultsRevealAt?: string;
+  votingStart?: string | null;
+  votingEnd?: string | null;
+  votingStartsAt?: string | null;
+  votingEndsAt?: string | null;
+  resultsRevealAt?: string | null;
   canAcceptVotes: boolean;
   publicVotingUrl: string;
   votingAvailability: string;
@@ -46,6 +46,7 @@ export type RankingItem = {
   photoUrl?: string;
   votes: number;
   percentage: number;
+  position?: number | null;
 };
 
 export type Results = {
@@ -56,6 +57,7 @@ export type Results = {
   isTestResult: boolean;
   tie: boolean;
   totalVotes: number;
+  updatedAt?: string;
   ranking: RankingItem[];
   winners: RankingItem[];
 };

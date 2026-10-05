@@ -30,7 +30,7 @@ export function ParticipantsPage() {
   return (
     <section className="grid gap-5 py-6">
       <BackHomeLink />
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="halloween-card flex flex-col gap-4 rounded-xl p-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-bold uppercase text-ember">Participantes</p>
           <h1 className="mt-2 text-3xl font-black text-white">Conheça as fantasias</h1>

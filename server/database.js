@@ -88,12 +88,14 @@ async function ensureSchema() {
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS voting_test_mode BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_live_results BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE votes ADD COLUMN IF NOT EXISTS voter_id UUID;
+        ALTER TABLE votes ADD COLUMN IF NOT EXISTS ip_hash VARCHAR(64);
         ALTER TABLE votes ADD COLUMN IF NOT EXISTS is_test_vote BOOLEAN NOT NULL DEFAULT FALSE;
         ALTER TABLE votes ALTER COLUMN vote_code_id DROP NOT NULL;
         ALTER TABLE votes DROP CONSTRAINT IF EXISTS votes_vote_code_id_key;
         CREATE UNIQUE INDEX IF NOT EXISTS votes_vote_code_official_unique ON votes (vote_code_id) WHERE is_test_vote = FALSE;
         CREATE UNIQUE INDEX IF NOT EXISTS votes_vote_code_test_unique ON votes (vote_code_id) WHERE is_test_vote = TRUE;
         CREATE UNIQUE INDEX IF NOT EXISTS votes_voter_context_unique ON votes (voter_id, is_test_vote) WHERE voter_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS votes_ip_context_unique ON votes (ip_hash, is_test_vote) WHERE ip_hash IS NOT NULL;
       `);
       await client.query(`
         INSERT INTO event_settings (

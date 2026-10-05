@@ -6,8 +6,10 @@ import com.festafantasia.api.entity.EventSettings;
 import com.festafantasia.api.repository.EventSettingsRepository;
 import java.time.Clock;
 import java.time.DateTimeException;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,9 @@ public class EventSettingsService {
     @Transactional
     public EventSettingsResponse update(EventSettingsRequest request) {
         var settings = currentEntity();
+        var requestZone = request.timezone() != null && !request.timezone().isBlank()
+                ? normalizeZone(request.timezone())
+                : zone(settings);
         if (request.eventName() != null) settings.setEventName(request.eventName());
         if (request.title() != null) settings.setTitle(request.title());
         if (request.description() != null) settings.setDescription(request.description());
@@ -41,18 +46,23 @@ public class EventSettingsService {
         if (request.eventTime() != null) settings.setEventTime(request.eventTime());
         if (request.votingEndTime() != null) settings.setVotingEndTime(request.votingEndTime());
         if (request.timezone() != null && !request.timezone().isBlank()) {
-            settings.setTimezone(normalizeZone(request.timezone()).getId());
+            settings.setTimezone(requestZone.getId());
         }
         if (request.votingOpen() != null) settings.setVotingOpen(request.votingOpen());
         if (request.registrationOpen() != null) settings.setRegistrationOpen(request.registrationOpen());
         if (request.resultsPublic() != null) settings.setResultsPublic(request.resultsPublic());
         if (request.showPublicResults() != null) settings.setShowPublicResults(request.showPublicResults());
+        if (request.showLiveResults() != null) settings.setShowLiveResults(request.showLiveResults());
+        if (request.votingTestMode() != null) settings.setVotingTestMode(request.votingTestMode());
         if (request.votingStatus() != null) {
             settings.setVotingStatus(request.votingStatus());
             settings.setVotingOpen("OPEN".equals(request.votingStatus()));
         }
-        if (request.votingStart() != null) settings.setVotingStart(request.votingStart());
-        if (request.votingEnd() != null) settings.setVotingEnd(request.votingEnd());
+        if (request.votingStartsAt() != null) settings.setVotingStart(parseDateTime(request.votingStartsAt(), requestZone));
+        else if (request.votingStart() != null) settings.setVotingStart(request.votingStart());
+        if (request.votingEndsAt() != null) settings.setVotingEnd(parseDateTime(request.votingEndsAt(), requestZone));
+        else if (request.votingEnd() != null) settings.setVotingEnd(request.votingEnd());
+        if (request.resultsRevealAt() != null) settings.setResultsRevealAt(parseDateTime(request.resultsRevealAt(), requestZone));
         return toResponse(settings);
     }
 
@@ -98,8 +108,11 @@ public class EventSettingsService {
     }
 
     public OffsetDateTime votingStartsAt(EventSettings settings) {
-        if (settings.getEventDate() == null || settings.getEventTime() == null) {
+        if (settings.getVotingStart() != null) {
             return settings.getVotingStart();
+        }
+        if (settings.getEventDate() == null || settings.getEventTime() == null) {
+            return null;
         }
         return settings.getEventDate()
                 .atTime(settings.getEventTime())
@@ -108,8 +121,11 @@ public class EventSettingsService {
     }
 
     public OffsetDateTime votingEndsAt(EventSettings settings) {
-        if (settings.getEventDate() == null || settings.getVotingEndTime() == null) {
+        if (settings.getVotingEnd() != null) {
             return settings.getVotingEnd();
+        }
+        if (settings.getEventDate() == null || settings.getVotingEndTime() == null) {
+            return null;
         }
         return settings.getEventDate()
                 .atTime(settings.getVotingEndTime())
@@ -117,9 +133,14 @@ public class EventSettingsService {
                 .toOffsetDateTime();
     }
 
+    public OffsetDateTime resultsRevealAt(EventSettings settings) {
+        return settings.getResultsRevealAt();
+    }
+
     public EventSettingsResponse toResponse(EventSettings settings) {
         var votingStart = votingStartsAt(settings);
         var votingEnd = votingEndsAt(settings);
+        var resultsReveal = resultsRevealAt(settings);
         return new EventSettingsResponse(
                 settings.getId(),
                 settings.getEventName(),
@@ -134,6 +155,11 @@ public class EventSettingsService {
                 settings.isResultsPublic(),
                 settings.getVotingStatus(),
                 settings.isShowPublicResults(),
+                settings.isShowLiveResults(),
+                settings.isVotingTestMode(),
+                votingStart,
+                votingEnd,
+                resultsReveal,
                 votingStart,
                 votingEnd,
                 canAcceptVotes(settings),
@@ -164,6 +190,17 @@ public class EventSettingsService {
             return ZoneId.of(timezone == null || timezone.isBlank() ? "America/Sao_Paulo" : timezone.trim());
         } catch (DateTimeException exception) {
             return ZoneId.of("America/Sao_Paulo");
+        }
+    }
+
+    private OffsetDateTime parseDateTime(String value, ZoneId zone) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(value);
+        } catch (DateTimeParseException ignored) {
+            return LocalDateTime.parse(value).atZone(zone).toOffsetDateTime();
         }
     }
 }

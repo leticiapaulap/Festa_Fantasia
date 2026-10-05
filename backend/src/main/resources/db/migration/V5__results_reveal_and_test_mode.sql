@@ -1,0 +1,8 @@
+ALTER TABLE event_settings
+    ADD COLUMN IF NOT EXISTS results_reveal_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE event_settings
+    ADD COLUMN IF NOT EXISTS voting_test_mode BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE event_settings
+    ADD COLUMN IF NOT EXISTS show_live_results BOOLEAN NOT NULL DEFAULT TRUE;

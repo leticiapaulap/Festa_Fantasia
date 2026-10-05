@@ -1,6 +1,10 @@
 const { getPool } = require('./database');
 const { dateOnly, httpError, nullable, timeOnly } = require('./http');
 
+const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
+const DATE_TIME_LOCAL_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+const DATE_TIME_COLUMNS = new Set(['voting_start', 'voting_end', 'results_reveal_at']);
+
 async function getSettings() {
   return settingsResponse(await getSettingsEntity());
 }
@@ -29,7 +33,11 @@ async function updateSettings(input) {
     votingTestMode: 'voting_test_mode',
     showLiveResults: 'show_live_results',
   })) {
-    if (input[key] !== undefined) next[column] = input[key];
+    if (input[key] !== undefined) {
+      next[column] = DATE_TIME_COLUMNS.has(column)
+        ? normalizeDateTimeInput(input[key], next.timezone)
+        : input[key];
+    }
   }
   if (input.votingStatus !== undefined) next.voting_open = input.votingStatus === 'OPEN';
   const { rows } = await getPool().query(`
@@ -43,7 +51,7 @@ async function updateSettings(input) {
     RETURNING *
   `, [
     next.event_name, next.title, next.description, nullable(next.event_date), nullable(next.event_time),
-    nullable(next.voting_end_time), next.timezone || 'America/Sao_Paulo', !!next.voting_open,
+    nullable(next.voting_end_time), next.timezone || DEFAULT_TIMEZONE, !!next.voting_open,
     !!next.registration_open, !!next.results_public, next.voting_status || 'DRAFT',
     !!next.show_public_results, nullable(next.voting_start), nullable(next.voting_end),
     nullable(next.results_reveal_at), !!next.voting_test_mode, next.show_live_results !== false,
@@ -80,7 +88,7 @@ function settingsResponse(row) {
     eventDate: dateOnly(row.event_date),
     eventTime: timeOnly(row.event_time),
     votingEndTime: timeOnly(row.voting_end_time),
-    timezone: row.timezone || 'America/Sao_Paulo',
+    timezone: row.timezone || DEFAULT_TIMEZONE,
     votingOpen: !!row.voting_open,
     registrationOpen: !!row.registration_open,
     resultsPublic: !!row.results_public,
@@ -130,21 +138,115 @@ function votingState(settings, now = new Date()) {
 }
 
 function votingStartsAt(settings) {
-  if (settings.event_date && settings.event_time) {
-    return new Date(`${dateOnly(settings.event_date)}T${timeOnly(settings.event_time) || '00:00:00'}-03:00`);
+  if (settings.voting_start) {
+    return storedDateTime(settings.voting_start, settings.timezone);
   }
-  return settings.voting_start ? new Date(settings.voting_start) : null;
+  if (settings.event_date && settings.event_time) {
+    return localDateTime(settings.event_date, settings.event_time, settings.timezone);
+  }
+  return null;
 }
 
 function votingEndsAt(settings) {
-  if (settings.event_date && settings.voting_end_time) {
-    return new Date(`${dateOnly(settings.event_date)}T${timeOnly(settings.voting_end_time) || '23:59:00'}-03:00`);
+  if (settings.voting_end) {
+    return storedDateTime(settings.voting_end, settings.timezone);
   }
-  return settings.voting_end ? new Date(settings.voting_end) : null;
+  if (settings.event_date && settings.voting_end_time) {
+    return localDateTime(settings.event_date, settings.voting_end_time, settings.timezone);
+  }
+  return null;
 }
 
 function resultsRevealAt(settings) {
-  return settings.results_reveal_at ? new Date(settings.results_reveal_at) : null;
+  return settings.results_reveal_at ? storedDateTime(settings.results_reveal_at, settings.timezone) : null;
+}
+
+function localDateTime(dateValue, timeValue, timezone) {
+  const date = dateOnly(dateValue);
+  const time = timeOnly(timeValue) || '00:00:00';
+  if (!date) return null;
+  return new Date(zonedDateTimeString(`${date}T${time}`, timezone));
+}
+
+function storedDateTime(value, timezone) {
+  if (value instanceof Date) return value;
+  const date = new Date(normalizeDateTimeInput(value, timezone));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function normalizeDateTimeInput(value, timezone) {
+  if (value === null || value === undefined || value === '') return value;
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!DATE_TIME_LOCAL_PATTERN.test(trimmed)) return trimmed;
+  return zonedDateTimeString(trimmed, timezone);
+}
+
+function zonedDateTimeString(value, timezone) {
+  const match = DATE_TIME_LOCAL_PATTERN.exec(value);
+  if (!match) return value;
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  const local = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+  const offset = timeZoneOffsetMinutes(
+    Number(year),
+    Number(month),
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+    timezone,
+  );
+  return `${local}${formatOffset(offset)}`;
+}
+
+function timeZoneOffsetMinutes(year, month, day, hour, minute, second, timezone) {
+  const zone = normalizeTimezone(timezone);
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+  const firstOffset = offsetMinutesAt(new Date(utcGuess), zone);
+  const resolvedUtc = utcGuess - firstOffset * 60_000;
+  return offsetMinutesAt(new Date(resolvedUtc), zone);
+}
+
+function offsetMinutesAt(date, timezone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const value = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  const localAsUtc = Date.UTC(
+    value('year'),
+    value('month') - 1,
+    value('day'),
+    value('hour'),
+    value('minute'),
+    value('second'),
+  );
+  return Math.round((localAsUtc - date.getTime()) / 60_000);
+}
+
+function formatOffset(offsetMinutes) {
+  const sign = offsetMinutes < 0 ? '-' : '+';
+  const absolute = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(absolute / 60)).padStart(2, '0');
+  const minutes = String(absolute % 60).padStart(2, '0');
+  return `${sign}${hours}:${minutes}`;
+}
+
+function normalizeTimezone(timezone) {
+  const value = typeof timezone === 'string' && timezone.trim() ? timezone.trim() : DEFAULT_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return value;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
 }
 
 async function votingStatus() {
@@ -160,7 +262,7 @@ async function votingStatus() {
     resultsRevealAt: reveal ? reveal.toISOString() : null,
     votingTestMode: !!settings.voting_test_mode,
     showLiveResults: settings.show_live_results !== false,
-    timezone: settings.timezone || 'America/Sao_Paulo',
+    timezone: settings.timezone || DEFAULT_TIMEZONE,
   };
 }
 

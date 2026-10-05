@@ -19,6 +19,11 @@ public class EventDtos {
             boolean resultsPublic,
             String votingStatus,
             boolean showPublicResults,
+            boolean showLiveResults,
+            boolean votingTestMode,
+            OffsetDateTime votingStartsAt,
+            OffsetDateTime votingEndsAt,
+            OffsetDateTime resultsRevealAt,
             OffsetDateTime votingStart,
             OffsetDateTime votingEnd,
             boolean canAcceptVotes,
@@ -39,7 +44,51 @@ public class EventDtos {
             Boolean resultsPublic,
             String votingStatus,
             Boolean showPublicResults,
+            Boolean showLiveResults,
+            Boolean votingTestMode,
+            String votingStartsAt,
+            String votingEndsAt,
+            String resultsRevealAt,
             OffsetDateTime votingStart,
             OffsetDateTime votingEnd
-    ) {}
+    ) {
+        public EventSettingsRequest(
+                String eventName,
+                String title,
+                String description,
+                LocalDate eventDate,
+                LocalTime eventTime,
+                LocalTime votingEndTime,
+                String timezone,
+                Boolean votingOpen,
+                Boolean registrationOpen,
+                Boolean resultsPublic,
+                String votingStatus,
+                Boolean showPublicResults,
+                OffsetDateTime votingStart,
+                OffsetDateTime votingEnd
+        ) {
+            this(
+                    eventName,
+                    title,
+                    description,
+                    eventDate,
+                    eventTime,
+                    votingEndTime,
+                    timezone,
+                    votingOpen,
+                    registrationOpen,
+                    resultsPublic,
+                    votingStatus,
+                    showPublicResults,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    votingStart,
+                    votingEnd
+            );
+        }
+    }
 }

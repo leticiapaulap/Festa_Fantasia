@@ -26,15 +26,21 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && path === 'voting/status') {
       const voterId = ensureVoterId(req, res);
       const status = await settings.votingStatus();
-      status.hasVoted = await voting.hasVoted(voterId, status.status);
+      status.hasVoted = await voting.hasVoted(voterId, status.status, req);
       res.setHeader('Cache-Control', 'no-store');
       return json(res, status);
     }
-    if (req.method === 'GET' && path === 'voting/live-results') return json(res, await results.liveResults());
-    if (req.method === 'GET' && path === 'voting/results') return json(res, await results.finalResults());
+    if (req.method === 'GET' && path === 'voting/live-results') {
+      res.setHeader('Cache-Control', 'no-store');
+      return json(res, await results.liveResults());
+    }
+    if (req.method === 'GET' && path === 'voting/results') {
+      res.setHeader('Cache-Control', 'no-store');
+      return json(res, await results.finalResults());
+    }
     if (req.method === 'POST' && path === 'votes') {
       const voterId = ensureVoterId(req, res);
-      return json(res, await voting.vote(await readJson(req), voterId));
+      return json(res, await voting.vote(await readJson(req), voterId, req));
     }
 
     if (req.method === 'GET' && path === 'admin/bootstrap/status') return json(res, await admin.bootstrapStatus());

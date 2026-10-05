@@ -1,14 +1,15 @@
 import axios from 'axios';
-import { Check, CheckCircle2, Clock3, Sparkles, Trophy, Users, Vote } from 'lucide-react';
+import { Check, CheckCircle2, Clock3, Sparkles, Users, Vote } from 'lucide-react';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { BackHomeLink } from '../components/BackHomeLink';
+import { RankingBoard } from '../components/RankingBoard';
 import { SkeletonGrid } from '../components/SkeletonGrid';
 import { api, apiMessage } from '../services/api';
-import type { Participant, RankingItem, Results, VotingStatus } from '../types/api';
+import type { Participant, Results, VotingStatus } from '../types/api';
 
-const LIVE_RESULTS_INTERVAL_MS = 12000;
+const LIVE_RESULTS_INTERVAL_MS = 10000;
 
 export function VotePage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -38,7 +39,7 @@ export function VotePage() {
     }
     const { data } = await api.get<Results>('/voting/live-results');
     setLiveResults(data);
-    setLiveUpdatedAt(new Date().toISOString());
+    setLiveUpdatedAt(data.updatedAt ?? new Date().toISOString());
   }, []);
 
   const loadFinalResults = useCallback(async (nextStatus: VotingStatus | null) => {
@@ -121,7 +122,7 @@ export function VotePage() {
     <section className="mx-auto grid w-full max-w-7xl gap-6 px-0 py-6">
       <BackHomeLink />
 
-      <header className="glass rounded-lg p-5 sm:p-6 lg:p-7">
+      <header className="halloween-card rounded-xl p-5 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm font-black uppercase tracking-normal text-ember">Halloween</p>
@@ -132,6 +133,7 @@ export function VotePage() {
             {status?.status === 'TEST' && <Badge tone="test">Modo teste</Badge>}
             {status?.status === 'OPEN' && <Badge>Votação aberta</Badge>}
             {status?.showLiveResults && ['TEST', 'OPEN'].includes(status.status) && <Badge tone="soft">Parcial ao vivo</Badge>}
+            {canVote && <a className="btn-secondary min-h-10 px-3 py-2 text-xs" href="#ranking-ao-vivo">Ver ranking em tempo real</a>}
           </div>
         </div>
         {canVote && <StepRail />}
@@ -160,11 +162,11 @@ export function VotePage() {
       )}
 
       {!loading && status?.status === 'CLOSED' && (
-        <div className="glass mx-auto w-full max-w-2xl rounded-lg p-6 text-center text-white/75">Votação encerrada. Obrigado pela participação.</div>
+        <div className="halloween-card mx-auto w-full max-w-2xl rounded-xl p-6 text-center text-white/75">Votação encerrada. Obrigado pela participação.</div>
       )}
 
       {!loading && status?.status === 'RESULT_PUBLISHED' && (
-        <FinalResults results={finalResults} />
+        <RankingBoard mode="final" results={finalResults} updatedAt={finalResults?.updatedAt} />
       )}
 
       {!loading && canVote && status && (
@@ -179,7 +181,7 @@ export function VotePage() {
                 <p className="text-sm text-white/55">{participants.length} fantasia{participants.length === 1 ? '' : 's'} disponível{participants.length === 1 ? '' : 'is'}</p>
               </div>
 
-              {participants.length === 0 && <div className="glass rounded-lg p-5 text-white/70">Nenhuma fantasia cadastrada ainda.</div>}
+              {participants.length === 0 && <div className="halloween-card rounded-xl p-5 text-white/70">Nenhuma fantasia cadastrada ainda.</div>}
 
               <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {participants.map((participant) => (
@@ -199,7 +201,7 @@ export function VotePage() {
               error={formError}
               lastVoteWasTest={lastVoteWasTest}
               onSubmit={confirmVote}
-              onViewResults={() => document.getElementById('resultado-parcial')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onViewResults={() => document.getElementById('ranking-ao-vivo')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               selected={selected}
               alreadyVoted={!!status.hasVoted}
               status={status}
@@ -207,12 +209,18 @@ export function VotePage() {
             />
           </div>
 
-          {status.showLiveResults && <LiveResults results={liveResults} updatedAt={liveUpdatedAt} />}
+          <RankingBoard
+            id="ranking-ao-vivo"
+            hidden={!status.showLiveResults}
+            mode={status.status === 'TEST' ? 'test' : 'live'}
+            results={liveResults}
+            updatedAt={liveUpdatedAt}
+          />
         </>
       )}
 
       {status?.status !== 'RESULT_PUBLISHED' && (
-        <div className="glass mx-auto w-full max-w-2xl rounded-lg p-5 text-center">
+        <div className="halloween-card mx-auto w-full max-w-2xl rounded-xl p-5 text-center">
           <Users className="mx-auto h-8 w-8 text-ember" />
           <p className="mt-2 text-white/75">Participantes já cadastrados</p>
           <Link className="btn-secondary mt-4" to="/participantes">Ver participantes</Link>
@@ -252,13 +260,13 @@ function VotingParticipantCard({ participant, selected, disabled, onSelect }: { 
       aria-pressed={selected}
       disabled={disabled}
       onClick={onSelect}
-      className={`glass group grid min-h-full gap-4 rounded-lg p-4 text-left transition duration-300 hover:-translate-y-1 hover:border-ember/55 focus:outline-none focus:ring-2 focus:ring-ember/30 ${
-        selected ? 'border-ember bg-ember/10 shadow-glow ring-2 ring-ember/25' : ''
+      className={`halloween-card group grid min-h-full gap-4 rounded-xl p-3 text-left transition duration-300 hover:-translate-y-1 hover:border-ember/55 hover:shadow-glow focus:outline-none focus:ring-2 focus:ring-ember/30 sm:p-4 ${
+        selected ? 'border-ember bg-ember/12 shadow-glow ring-2 ring-ember/30' : ''
       }`}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gradient-to-br from-velvet/45 via-black/30 to-ember/25">
+      <div className="participant-photo-frame relative aspect-[3/4] w-full rounded-xl">
         {participant.photoUrl ? (
-          <img src={participant.photoUrl} alt={participant.costumeName} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          <img src={participant.photoUrl} alt={participant.costumeName} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
         ) : (
           <div className="flex h-full items-center justify-center">
             <Sparkles className="h-14 w-14 text-ember/80" />
@@ -271,8 +279,11 @@ function VotingParticipantCard({ participant, selected, disabled, onSelect }: { 
           </span>
         )}
       </div>
-      <div className="min-w-0">
-        <p className="truncate text-base font-bold text-white/72">{participant.name}</p>
+      <div className="min-w-0 space-y-2">
+        <span className={`participant-status ${selected ? 'border-ember/50 bg-ember/12 text-orange-100' : 'border-white/12 bg-white/8 text-white/72'}`}>
+          {selected ? 'Selecionado' : 'Pronto para votação'}
+        </span>
+        <p className="truncate text-sm font-bold uppercase text-white/60">{participant.name}</p>
         <h3 className="mt-1 text-xl font-black leading-tight text-white">{participant.costumeName}</h3>
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/62">{participant.description || 'Fantasia misteriosa pronta para surpreender a noite.'}</p>
       </div>
@@ -304,7 +315,7 @@ function ConfirmationPanel({
 }) {
   if (done || alreadyVoted) {
     return (
-      <aside className="glass grid gap-4 rounded-lg p-5 text-center xl:sticky xl:top-6">
+      <aside className="halloween-card grid gap-4 rounded-xl p-5 text-center xl:sticky xl:top-6">
         <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-300" />
         <div>
           <p className="text-sm font-black uppercase text-ember">{alreadyVoted && !done ? 'Você já votou nesta votação.' : 'Voto registrado!'}</p>
@@ -319,17 +330,17 @@ function ConfirmationPanel({
   }
 
   return (
-    <aside className="glass rounded-lg p-5 xl:sticky xl:top-6">
+    <aside className="halloween-card rounded-xl p-5 xl:sticky xl:top-6">
       <form className="grid gap-5" onSubmit={onSubmit}>
         <div>
           <p className="text-sm font-bold uppercase text-ember">2. Confirmar seu voto</p>
           <h2 className="mt-1 text-2xl font-black text-white">Sua escolha</h2>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
           {selected ? (
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white/10">
+            <div className="flex items-center gap-4">
+              <div className="participant-photo-frame h-24 w-20 shrink-0 rounded-xl sm:h-32 sm:w-28">
                 {selected.photoUrl ? (
                   <img src={selected.photoUrl} alt={selected.costumeName} className="h-full w-full object-cover" />
                 ) : (
@@ -339,8 +350,9 @@ function ConfirmationPanel({
                 )}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm text-white/60">{selected.name}</p>
-                <p className="truncate text-lg font-black text-white">{selected.costumeName}</p>
+                <span className="participant-status border-ember/35 bg-ember/12 text-orange-100">Sua escolha</span>
+                <p className="mt-3 truncate text-sm font-bold uppercase text-white/60">{selected.name}</p>
+                <p className="mt-1 text-xl font-black leading-tight text-white sm:text-2xl">{selected.costumeName}</p>
               </div>
             </div>
           ) : (
@@ -432,111 +444,4 @@ function TimeBox({ value, label }: { value: number; label: string }) {
       <p className="text-xs font-bold uppercase text-white/55">{label}</p>
     </div>
   );
-}
-
-function LiveResults({ results, updatedAt }: { results: Results | null; updatedAt: string | null }) {
-  const totalVotes = results?.totalVotes ?? 0;
-  return (
-    <section id="resultado-parcial" className="glass grid gap-5 rounded-lg p-5 sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-black uppercase text-ember">Resultado parcial</p>
-          <h2 className="mt-1 text-3xl font-black text-white">Votos atuais</h2>
-          <p className="mt-2 text-sm text-white/60">Resultado parcial, sem vencedor declarado.</p>
-        </div>
-        <div className="text-left sm:text-right">
-          <p className="text-sm font-bold text-white/70">{totalVotes} voto{totalVotes === 1 ? '' : 's'} computado{totalVotes === 1 ? '' : 's'}</p>
-          <p className="text-sm text-white/50">Última atualização: {updatedAt ? formatTime(updatedAt) : '--:--:--'}</p>
-        </div>
-      </div>
-      <RankingList items={results?.ranking ?? []} totalVotes={totalVotes} variant="partial" />
-    </section>
-  );
-}
-
-function FinalResults({ results }: { results: Results | null }) {
-  return (
-    <div className="grid gap-5">
-      <div className="text-center">
-        <Trophy className="mx-auto h-14 w-14 text-ember" />
-        <p className="mt-3 text-sm font-black uppercase text-ember">{results?.tie ? 'Empate no primeiro lugar' : 'Resultado final'}</p>
-        <h2 className="mt-2 text-4xl font-black text-white">Halloween</h2>
-      </div>
-      <section className="glass rounded-lg p-5 sm:p-6">
-        <RankingList items={results?.ranking ?? []} totalVotes={results?.totalVotes ?? 0} variant="final" />
-      </section>
-    </div>
-  );
-}
-
-function RankingList({ items, totalVotes, variant }: { items: RankingItem[]; totalVotes: number; variant: 'partial' | 'final' }) {
-  if (items.length === 0) return <p className="text-white/60">Ainda não há votos.</p>;
-  return (
-    <div className="grid gap-3">
-      {items.map((item, index) => {
-        const percentage = totalVotes ? item.percentage : 0;
-        const rank = rankFor(items, index);
-        const tied = item.votes > 0 && items.some((other, otherIndex) => otherIndex !== index && other.votes === item.votes);
-        return (
-          <article key={item.participantId} className="rounded-lg border border-white/10 bg-black/25 p-4">
-            <div className="grid gap-4 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-center">
-              <div className="flex items-center gap-3 sm:block">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-ember/30 bg-ember/12 text-lg font-black text-ember sm:mx-auto">
-                  {positionText(rank)}
-                </div>
-                <div className="h-16 w-16 overflow-hidden rounded-lg bg-white/10 sm:mt-3 sm:h-14 sm:w-14">
-                  {item.photoUrl ? (
-                    <img src={item.photoUrl} alt={item.costumeName} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="grid h-full place-items-center">
-                      <Sparkles className="h-6 w-6 text-ember" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-xl font-black leading-tight text-white">{variant === 'final' && rank <= 3 ? `${rank}º lugar - ` : ''}{item.costumeName}</h3>
-                  {tied && <span className="rounded-md border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-xs font-black uppercase text-amber-100">Empate</span>}
-                </div>
-                <p className="mt-1 text-sm text-white/60">{item.participantName}</p>
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-ember shadow-glow transition-all duration-500" style={{ width: `${Math.min(100, percentage)}%` }} />
-                </div>
-              </div>
-
-              <div className="flex items-end justify-between gap-4 sm:block sm:text-right">
-                <p className="text-2xl font-black text-white">{item.votes}</p>
-                <p className="text-xs font-bold uppercase text-white/45">voto{item.votes === 1 ? '' : 's'}</p>
-                <p className="text-xl font-black text-ember sm:mt-2">{formatPercent(percentage)}</p>
-              </div>
-            </div>
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
-function rankFor(items: RankingItem[], index: number) {
-  if (!items[index].votes) return index + 1;
-  let rank = 1;
-  for (let i = 1; i <= index; i += 1) {
-    if (items[i].votes < items[i - 1].votes) rank = i + 1;
-  }
-  return rank;
-}
-
-function positionText(rank: number) {
-  return `${rank}º`;
-}
-
-function formatPercent(value: number) {
-  const safeValue = Number.isFinite(value) ? value : 0;
-  return `${safeValue.toFixed(safeValue % 1 === 0 ? 0 : 1)}%`;
-}
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }

@@ -7,7 +7,7 @@ async function results(publicView) {
   const state = votingState(settings);
   const canShowPublic = !publicView || state === 'RESULT_PUBLISHED';
   if (!canShowPublic) return emptyResults(settings, state);
-  return resultsForMode({ isTestVote: false, status: state, resultsPublic: canShowPublic, final: state === 'RESULT_PUBLISHED' });
+  return resultsForMode({ isTestVote: state === 'TEST', status: state, resultsPublic: canShowPublic, final: state === 'RESULT_PUBLISHED' });
 }
 
 async function liveResults() {
@@ -33,6 +33,7 @@ async function finalResults() {
       final: false,
       tie: false,
       totalVotes: 0,
+      updatedAt: new Date().toISOString(),
       ranking: [],
       winners: [],
     };
@@ -77,6 +78,7 @@ async function resultsForMode({ isTestVote, status, resultsPublic, final }) {
     isTestResult: !!isTestVote,
     tie: winners.length > 1,
     totalVotes,
+    updatedAt: new Date().toISOString(),
     ranking,
     winners,
   };
@@ -91,6 +93,7 @@ function emptyResults(settings, status) {
     isTestResult: false,
     tie: false,
     totalVotes: 0,
+    updatedAt: new Date().toISOString(),
     ranking: [],
     winners: [],
   };

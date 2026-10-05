@@ -54,6 +54,15 @@ public class EventSettings {
     @Column(name = "voting_end")
     private OffsetDateTime votingEnd;
 
+    @Column(name = "results_reveal_at")
+    private OffsetDateTime resultsRevealAt;
+
+    @Column(name = "voting_test_mode", nullable = false)
+    private boolean votingTestMode = true;
+
+    @Column(name = "show_live_results", nullable = false)
+    private boolean showLiveResults = true;
+
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
@@ -98,4 +107,10 @@ public class EventSettings {
     public void setVotingStart(OffsetDateTime votingStart) { this.votingStart = votingStart; }
     public OffsetDateTime getVotingEnd() { return votingEnd; }
     public void setVotingEnd(OffsetDateTime votingEnd) { this.votingEnd = votingEnd; }
+    public OffsetDateTime getResultsRevealAt() { return resultsRevealAt; }
+    public void setResultsRevealAt(OffsetDateTime resultsRevealAt) { this.resultsRevealAt = resultsRevealAt; }
+    public boolean isVotingTestMode() { return votingTestMode; }
+    public void setVotingTestMode(boolean votingTestMode) { this.votingTestMode = votingTestMode; }
+    public boolean isShowLiveResults() { return showLiveResults; }
+    public void setShowLiveResults(boolean showLiveResults) { this.showLiveResults = showLiveResults; }
 }

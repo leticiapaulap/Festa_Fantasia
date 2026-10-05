@@ -3,6 +3,7 @@ import { Trophy } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BackHomeLink } from '../components/BackHomeLink';
 import { ParticipantCard } from '../components/ParticipantCard';
+import { RankingBoard } from '../components/RankingBoard';
 import { api, apiMessage } from '../services/api';
 import type { Results } from '../types/api';
 
@@ -35,22 +36,7 @@ export function ResultPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {results.winners.map((winner) => <ParticipantCard key={winner.participantId} ranking={winner} />)}
       </div>
-      <div className="card">
-        <h2 className="mb-4 text-xl font-bold text-white">Ranking final</h2>
-        <div className="grid gap-3">
-          {results.ranking.map((item, index) => (
-            <div key={item.participantId} className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-bold text-white">{index + 1}º {item.costumeName} — {item.participantName}</span>
-                <span className="text-white/70">{item.votes} votos</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-ember" style={{ width: `${Math.min(100, item.percentage)}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <RankingBoard mode="final" results={results} updatedAt={results.updatedAt} />
     </PageShell>
   );
 }

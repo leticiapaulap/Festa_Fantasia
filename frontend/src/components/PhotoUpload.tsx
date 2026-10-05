@@ -49,11 +49,11 @@ export function PhotoUpload({ file, onChange, currentUrl, onRemoveCurrent }: Pro
       </div>
       <button
         type="button"
-        className="grid min-h-44 w-full place-items-center overflow-hidden rounded-lg border border-dashed border-white/20 bg-black/25 p-3 text-center transition hover:border-ember/60 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-ember/40"
+        className="grid min-h-56 w-full place-items-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-black/25 p-3 text-center transition hover:border-ember/60 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-ember/40"
         onClick={() => inputRef.current?.click()}
       >
         {visibleUrl ? (
-          <img src={visibleUrl} alt="Prévia da foto do participante" className="aspect-square w-full max-w-xs rounded-lg object-cover" />
+          <img src={visibleUrl} alt="Prévia da foto do participante" className="participant-photo-frame aspect-[4/5] w-full max-w-sm rounded-xl object-cover" />
         ) : (
           <span className="grid place-items-center gap-2 text-white/70">
             <ImagePlus className="h-9 w-9 text-ember" />

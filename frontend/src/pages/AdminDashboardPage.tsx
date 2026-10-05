@@ -12,6 +12,7 @@ import {
   Plus,
   QrCode,
   Settings,
+  Sparkles,
   Trash2,
   Trophy,
   Users,
@@ -20,12 +21,12 @@ import {
 } from 'lucide-react';
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 import { type LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AdminHeader } from '../components/AdminHeader';
 import { Modal } from '../components/Modal';
-import { ParticipantCard } from '../components/ParticipantCard';
 import { PhotoUpload } from '../components/PhotoUpload';
+import { RankingBoard } from '../components/RankingBoard';
 import { api, apiMessage } from '../services/api';
 import { formatEventDate, registrationStatusLabel, votingStatusLabel } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
@@ -115,7 +116,7 @@ export function AdminDashboardPage() {
   }
 
   async function saveSettings(next: EventSettings) {
-    await persistSettings(next, 'Configurações salvas.');
+    return persistSettings(next, 'Configurações salvas com sucesso.');
   }
 
   async function persistSettings(next: EventSettings, successMessage: string) {
@@ -123,8 +124,10 @@ export function AdminDashboardPage() {
       await api.put('/admin/settings', next);
       toast.success(successMessage);
       await load();
+      return true;
     } catch (error) {
       toast.error(apiMessage(error));
+      return false;
     }
   }
 
@@ -471,13 +474,12 @@ function SummaryAdmin({
 
 function Ranking({ results }: { results: Results | null }) {
   return (
-    <div className="card">
-      <h2 className="mb-4 text-xl font-bold text-white">Ranking em tempo real</h2>
-      <div className="grid gap-3">
-        {results?.ranking.map((item, index) => <ParticipantCard key={item.participantId} ranking={item} action={<span className="text-sm text-white/60">{index + 1}º lugar</span>} />)}
-        {results?.ranking.length === 0 && <p className="text-white/60">Ainda não há votos.</p>}
-      </div>
-    </div>
+    <RankingBoard
+      mode={results?.isTestResult ? 'test' : results?.final ? 'final' : 'live'}
+      results={results}
+      updatedAt={results?.updatedAt}
+      variant="admin"
+    />
   );
 }
 
@@ -498,9 +500,27 @@ function ParticipantsAdmin({
         <button className="btn-primary" onClick={onCreate}><Plus className="h-4 w-4" /> Cadastrar participante</button>
       </div>
       {participants.map((participant) => (
-        <div key={participant.id} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="font-bold text-white">{participant.name}</p><p className="text-ember">{participant.costumeName}</p><p className="text-sm text-white/50">{participant.photoUrl ? 'Foto cadastrada' : 'Sem foto'}</p></div>
-          <div className="flex gap-2">
+        <div key={participant.id} className="halloween-card flex flex-col gap-4 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <div className="flex min-w-0 gap-4">
+            <div className="participant-photo-frame h-28 w-24 shrink-0 rounded-xl">
+              {participant.photoUrl ? (
+                <img src={participant.photoUrl} alt={participant.costumeName} className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full place-items-center">
+                  <Sparkles className="h-8 w-8 text-ember" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 self-center">
+              <span className={`participant-status ${participant.active ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-100' : 'border-white/12 bg-white/8 text-white/55'}`}>
+                {participant.active ? 'Pronto para votação' : 'Inativo'}
+              </span>
+              <p className="mt-3 truncate font-bold text-white">{participant.name}</p>
+              <p className="truncate text-ember">{participant.costumeName}</p>
+              <p className="text-sm text-white/50">{participant.photoUrl ? 'Foto cadastrada' : 'Sem foto'}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             <button className="btn-secondary" onClick={() => onEdit(participant)}><Edit3 className="h-4 w-4" /> Editar</button>
             <button className="btn-secondary" onClick={() => onDelete(participant.id)}><Trash2 className="h-4 w-4" /> Excluir</button>
           </div>
@@ -620,19 +640,53 @@ function StatusRow({
   );
 }
 
-function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: (settings: EventSettings) => void }) {
-  const [draft, setDraft] = useState(settings);
-  useEffect(() => setDraft(settings), [settings]);
+const SAO_PAULO_TIMEZONE = 'America/Sao_Paulo';
+const DATE_TIME_LOCAL_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: (settings: EventSettings) => Promise<boolean> }) {
+  const [draft, setDraft] = useState<EventSettings>(() => settingsToDraft(settings));
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    if (!dirty) setDraft(settingsToDraft(settings));
+  }, [settings, dirty]);
+
+  function updateDraft(changes: Partial<EventSettings>) {
+    setDraft((current) => ({ ...current, ...changes }));
+    setDirty(true);
+    setFormError('');
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const validationMessage = validateDateTimeOrder(draft);
+    if (validationMessage) {
+      setFormError(validationMessage);
+      toast.error(validationMessage);
+      return;
+    }
+
+    setSaving(true);
+    const saved = await onSave(settingsPayload(draft));
+    setSaving(false);
+    if (saved) {
+      setDirty(false);
+      setFormError('');
+    }
+  }
+
   return (
-    <form className="card grid gap-4" onSubmit={(event) => { event.preventDefault(); onSave({ ...draft, votingStatus: 'SCHEDULED', votingOpen: false }); }}>
-      <input className="input" value={draft.eventName} onChange={(e) => setDraft({ ...draft, eventName: e.target.value })} />
-      <input className="input" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-      <textarea className="input min-h-24" value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+    <form className="card grid gap-4" onSubmit={handleSubmit}>
+      <input className="input" value={draft.eventName} onChange={(e) => updateDraft({ eventName: e.target.value })} />
+      <input className="input" value={draft.title} onChange={(e) => updateDraft({ title: e.target.value })} />
+      <textarea className="input min-h-24" value={draft.description ?? ''} onChange={(e) => updateDraft({ description: e.target.value })} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <input className="input" type="date" value={draft.eventDate ?? ''} onChange={(e) => setDraft({ ...draft, eventDate: e.target.value })} />
-        <input className="input" type="time" value={draft.eventTime ?? ''} onChange={(e) => setDraft({ ...draft, eventTime: e.target.value })} />
-        <input className="input" type="time" value={draft.votingEndTime ?? ''} onChange={(e) => setDraft({ ...draft, votingEndTime: e.target.value })} aria-label="Encerramento da votação" />
-        <input className="input" value={draft.timezone ?? 'America/Sao_Paulo'} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })} placeholder="America/Sao_Paulo" aria-label="Timezone" />
+        <input className="input" type="date" value={draft.eventDate ?? ''} onChange={(e) => updateDraft({ eventDate: e.target.value })} />
+        <input className="input" type="time" value={draft.eventTime ?? ''} onChange={(e) => updateDraft({ eventTime: e.target.value })} />
+        <input className="input" type="time" value={draft.votingEndTime ?? ''} onChange={(e) => updateDraft({ votingEndTime: e.target.value })} aria-label="Encerramento da votação" />
+        <input className="input" value={draft.timezone ?? SAO_PAULO_TIMEZONE} onChange={(e) => updateDraft({ timezone: e.target.value })} placeholder="America/Sao_Paulo" aria-label="Timezone" />
       </div>
       <div className="grid gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
         <div>
@@ -642,37 +696,112 @@ function SettingsAdmin({ settings, onSave }: { settings: EventSettings; onSave: 
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="grid gap-2 text-sm font-semibold text-white/80">
             Abertura
-            <input className="input" type="datetime-local" value={toDateTimeLocal(draft.votingStartsAt ?? draft.votingStart)} onChange={(e) => setDraft({ ...draft, votingStartsAt: fromDateTimeLocal(e.target.value), votingStart: fromDateTimeLocal(e.target.value) })} />
+            <input className="input" type="datetime-local" value={draft.votingStartsAt ?? ''} onChange={(e) => updateDraft({ votingStartsAt: e.target.value })} />
           </label>
           <label className="grid gap-2 text-sm font-semibold text-white/80">
             Encerramento
-            <input className="input" type="datetime-local" value={toDateTimeLocal(draft.votingEndsAt ?? draft.votingEnd)} onChange={(e) => setDraft({ ...draft, votingEndsAt: fromDateTimeLocal(e.target.value), votingEnd: fromDateTimeLocal(e.target.value) })} />
+            <input className="input" type="datetime-local" value={draft.votingEndsAt ?? ''} onChange={(e) => updateDraft({ votingEndsAt: e.target.value })} />
           </label>
           <label className="grid gap-2 text-sm font-semibold text-white/80">
             Resultado final
-            <input className="input" type="datetime-local" value={toDateTimeLocal(draft.resultsRevealAt)} onChange={(e) => setDraft({ ...draft, resultsRevealAt: fromDateTimeLocal(e.target.value) })} />
+            <input className="input" type="datetime-local" value={draft.resultsRevealAt ?? ''} onChange={(e) => updateDraft({ resultsRevealAt: e.target.value })} />
           </label>
         </div>
+        {formError && <p className="text-sm font-semibold text-amber-100" role="alert">{formError}</p>}
       </div>
-      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.registrationOpen} onChange={(e) => setDraft({ ...draft, registrationOpen: e.target.checked })} /> Cadastro aberto</label>
-      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.votingTestMode} onChange={(e) => setDraft({ ...draft, votingTestMode: e.target.checked })} /> Modo de teste da votação</label>
-      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.showLiveResults} onChange={(e) => setDraft({ ...draft, showLiveResults: e.target.checked })} /> Exibir resultado parcial durante votação</label>
-      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.resultsPublic} onChange={(e) => setDraft({ ...draft, resultsPublic: e.target.checked, showPublicResults: e.target.checked })} /> Resultado público</label>
-      <button className="btn-primary w-full">Salvar configurações</button>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.registrationOpen} onChange={(e) => updateDraft({ registrationOpen: e.target.checked })} /> Cadastro aberto</label>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.votingTestMode} onChange={(e) => updateDraft({ votingTestMode: e.target.checked })} /> Modo de teste da votação</label>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.showLiveResults} onChange={(e) => updateDraft({ showLiveResults: e.target.checked })} /> Exibir resultado parcial durante votação</label>
+      <label className="flex gap-3 text-white/75"><input type="checkbox" checked={draft.resultsPublic} onChange={(e) => updateDraft({ resultsPublic: e.target.checked, showPublicResults: e.target.checked })} /> Resultado público</label>
+      <button className="btn-primary w-full" disabled={saving}>{saving ? 'Salvando...' : 'Salvar configurações'}</button>
     </form>
   );
 }
 
-function toDateTimeLocal(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+function settingsToDraft(settings: EventSettings): EventSettings {
+  const timezone = normalizeTimezone(settings.timezone);
+  return {
+    ...settings,
+    timezone,
+    votingStartsAt: toDateTimeLocal(settings.votingStartsAt ?? settings.votingStart, timezone),
+    votingEndsAt: toDateTimeLocal(settings.votingEndsAt ?? settings.votingEnd, timezone),
+    resultsRevealAt: toDateTimeLocal(settings.resultsRevealAt, timezone),
+    votingStart: undefined,
+    votingEnd: undefined,
+  };
 }
 
-function fromDateTimeLocal(value: string) {
-  return value ? new Date(value).toISOString() : '';
+function settingsPayload(draft: EventSettings): EventSettings {
+  return {
+    ...draft,
+    timezone: normalizeTimezone(draft.timezone),
+    votingStartsAt: emptyToNull(draft.votingStartsAt),
+    votingEndsAt: emptyToNull(draft.votingEndsAt),
+    resultsRevealAt: emptyToNull(draft.resultsRevealAt),
+    votingStart: undefined,
+    votingEnd: undefined,
+    votingStatus: 'SCHEDULED',
+    votingOpen: false,
+  };
+}
+
+function toDateTimeLocal(value?: string | null, timezone = SAO_PAULO_TIMEZONE) {
+  if (!value) return '';
+  if (DATE_TIME_LOCAL_PATTERN.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return formatDateTimeInZone(date, timezone);
+}
+
+function formatDateTimeInZone(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: normalizeTimezone(timezone),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
+}
+
+function validateDateTimeOrder(draft: EventSettings) {
+  const start = parseDateTimeLocal(draft.votingStartsAt);
+  const end = parseDateTimeLocal(draft.votingEndsAt);
+  const reveal = parseDateTimeLocal(draft.resultsRevealAt);
+  if (start === 'invalid') return 'Abertura deve ter uma data e hora válidas.';
+  if (end === 'invalid') return 'Encerramento deve ter uma data e hora válidos.';
+  if (reveal === 'invalid') return 'Resultado final deve ter uma data e hora válidos.';
+  if (start !== null && end !== null && end <= start) return 'Encerramento deve ser posterior à abertura.';
+  if (end !== null && reveal !== null && reveal <= end) return 'Resultado final deve ser posterior ao encerramento.';
+  if (start !== null && reveal !== null && reveal <= start) return 'Resultado final deve ser posterior à abertura.';
+  return '';
+}
+
+function parseDateTimeLocal(value?: string | null) {
+  if (!value) return null;
+  const match = DATE_TIME_LOCAL_PATTERN.exec(value);
+  if (!match) return 'invalid';
+  const [, year, month, day, hour, minute] = match.map(Number);
+  const date = new Date(year, month - 1, day, hour, minute);
+  if (
+    date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+    || date.getHours() !== hour
+    || date.getMinutes() !== minute
+  ) return 'invalid';
+  return date.getTime();
+}
+
+function normalizeTimezone(value?: string | null) {
+  return value?.trim() || SAO_PAULO_TIMEZONE;
+}
+
+function emptyToNull(value?: string | null) {
+  return value?.trim() ? value : null;
 }
 
 function ParticipantModal({
