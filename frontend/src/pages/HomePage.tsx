@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { eventPhase, formatEventDate } from '../services/eventPhase';
 import { publicVotingUrl } from '../services/publicUrl';
 import { useEventSettings } from '../services/useEventSettings';
+import type { EventSettings } from '../types/api';
+
+const VOTING_RELEASE_AT = '2026-11-15T00:00:00-03:00';
 
 export function HomePage() {
   const { settings, loading: settingsLoading, error: settingsError } = useEventSettings();
@@ -12,9 +15,9 @@ export function HomePage() {
 
   const phase = settings ? eventPhase(settings) : null;
   const eventDate = formatEventDate(settings);
+  const partyStartsAt = getPartyStart(settings);
   const voteUrl = publicVotingUrl();
   const votingAvailable = settings?.votingState === 'OPEN' || settings?.votingState === 'TEST';
-  const votingBlockedBySchedule = !!settings?.votingStartsAt && !votingAvailable && phase !== 'FINISHED';
   const steps = useMemo(() => !phase ? [] : phase === 'VOTING'
     ? ['Escolha sua fantasia favorita', 'Confirme seu voto', 'Aguarde o resultado final']
     : ['Cadastre sua fantasia', 'Envie sua foto', 'Aguarde o dia da votação'], [phase]);
@@ -27,8 +30,8 @@ export function HomePage() {
   }, []);
 
   return (
-    <section className="grid gap-6 py-4 md:grid-cols-[1.02fr_minmax(20rem,0.98fr)] md:items-center md:py-10">
-      <div className="py-6">
+    <section className="grid gap-5 py-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)] lg:items-stretch lg:gap-6 lg:py-8">
+      <div className="flex flex-col justify-center py-4 sm:py-6">
         <p className="mb-3 inline-flex rounded-full border border-ember/35 bg-ember/10 px-3 py-1 text-sm font-bold uppercase text-ember">
           Concurso da noite
         </p>
@@ -49,9 +52,9 @@ export function HomePage() {
           <>
             <p className="mt-4 inline-flex rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-sm font-bold uppercase text-emerald-100">Cadastros abertos</p>
             <p className="mt-4 max-w-2xl text-xl leading-8 text-white/75">Cadastre sua fantasia para participar do Halloween.</p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Link className="btn-primary" to="/cadastro">Cadastrar minha fantasia</Link>
-              <Link className="btn-secondary" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Link className="btn-primary min-h-12 px-3 text-center" to="/cadastro">Cadastrar minha fantasia</Link>
+              <Link className="btn-secondary min-h-12 px-3" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
             </div>
           </>
         )}
@@ -60,8 +63,8 @@ export function HomePage() {
           <>
             <p className="mt-4 inline-flex rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold uppercase text-white/75">Cadastros encerrados</p>
             <p className="mt-4 max-w-2xl text-xl leading-8 text-white/75">Estamos preparando a votação. Ela será liberada durante o evento.</p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Link className="btn-secondary" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Link className="btn-secondary min-h-12 px-3" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
             </div>
           </>
         )}
@@ -70,9 +73,9 @@ export function HomePage() {
           <>
             <p className="mt-4 inline-flex rounded-lg border border-ember/35 bg-ember/10 px-3 py-2 text-sm font-bold uppercase text-ember">Votação aberta</p>
             <p className="mt-4 max-w-2xl text-xl leading-8 text-white/75">Vote na sua fantasia favorita.</p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Link className="btn-primary text-base sm:text-sm" to="/votar"><Vote className="h-4 w-4" /> Votar agora</Link>
-              <Link className="btn-secondary" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Link className="btn-primary min-h-12 px-3 text-base sm:text-sm" to="/votar"><Vote className="h-4 w-4" /> Votar agora</Link>
+              <Link className="btn-secondary min-h-12 px-3" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
             </div>
           </>
         )}
@@ -81,17 +84,17 @@ export function HomePage() {
           <>
             <p className="mt-4 inline-flex rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold uppercase text-white/75">Votação encerrada</p>
             <p className="mt-4 max-w-2xl text-xl leading-8 text-white/75">Obrigado pela participação.</p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              {settings?.showPublicResults && <Link className="btn-primary" to="/resultado"><Trophy className="h-4 w-4" /> Ver resultado</Link>}
-              <Link className="btn-secondary" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {settings?.showPublicResults && <Link className="btn-primary min-h-12 px-3" to="/resultado"><Trophy className="h-4 w-4" /> Ver resultado</Link>}
+              <Link className="btn-secondary min-h-12 px-3" to="/participantes"><Users className="h-4 w-4" /> Ver participantes</Link>
             </div>
           </>
         )}
 
         {steps.length > 0 && (
-          <div className="mt-8 grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4 sm:grid-cols-3">
+          <div className="mt-6 grid gap-3 rounded-lg border border-white/10 bg-white/5 p-3 sm:grid-cols-3 sm:p-4">
             {steps.map((item) => (
-              <div key={item} className="flex items-center gap-3 text-sm text-white/70">
+              <div key={item} className="flex min-h-14 items-center gap-3 rounded-lg border border-white/8 bg-black/15 px-3 py-2 text-sm text-white/70">
                 <CalendarClock className="h-5 w-5 shrink-0 text-ember" />
                 <span>{item}</span>
               </div>
@@ -100,7 +103,7 @@ export function HomePage() {
         )}
       </div>
 
-      <aside className="halloween-card rounded-xl p-4">
+      <aside className="halloween-card flex min-h-[20rem] flex-col justify-center rounded-xl p-4 sm:p-5 lg:min-h-full lg:p-6">
         {!phase && (
           <StatusPanel title="VOTAÇÃO" text={settingsLoading ? 'Carregando informações do evento...' : 'Não foi possível carregar as informações do evento.'} />
         )}
@@ -112,14 +115,27 @@ export function HomePage() {
           />
         )}
         {phase && phase !== 'FINISHED' && !votingAvailable && (
-          <LockedVotingPanel startsAt={settings?.votingStartsAt} tick={tick} showCountdown={votingBlockedBySchedule} />
+          <LockedVotingPanel />
         )}
         {phase === 'FINISHED' && (
           <StatusPanel title="VOTAÇÃO" text="A votação foi encerrada. Obrigado por participar." />
         )}
+        {phase && phase !== 'FINISHED' && (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {partyStartsAt && <CountdownPanel target={partyStartsAt} tick={tick} label="A festa começa em" />}
+            {!votingAvailable && (
+              <CountdownPanel
+                target={VOTING_RELEASE_AT}
+                tick={tick}
+                label="A votação abre em"
+                detail="00h na virada de 14 para 15/11 · Horário de Brasília"
+              />
+            )}
+          </div>
+        )}
       </aside>
 
-      <footer className="md:col-span-2">
+      <footer className="lg:col-span-2">
         <Link to="/admin" className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-white/65 underline-offset-4 transition hover:bg-white/10 hover:text-white">
           <LockKeyhole className="h-4 w-4" />
           Área administrativa
@@ -183,7 +199,7 @@ function QrPanel({
   );
 }
 
-function LockedVotingPanel({ startsAt, tick, showCountdown }: { startsAt?: string | null; tick: number; showCountdown: boolean }) {
+function LockedVotingPanel() {
   return (
     <div className="mx-auto grid w-full max-w-[26rem] gap-5 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg border border-ember/25 bg-ember/10 text-ember">
@@ -195,12 +211,11 @@ function LockedVotingPanel({ startsAt, tick, showCountdown }: { startsAt?: strin
           Votação será liberada em breve.
         </p>
       </div>
-      {showCountdown && startsAt && <VoteCountdown target={startsAt} tick={tick} />}
     </div>
   );
 }
 
-function VoteCountdown({ target, tick }: { target: string; tick: number }) {
+function CountdownPanel({ target, tick, label, detail }: { target: string | Date; tick: number; label: string; detail?: string }) {
   const remaining = Math.max(0, new Date(target).getTime() - tick);
   const totalSeconds = Math.floor(remaining / 1000);
   const days = Math.floor(totalSeconds / 86400);
@@ -208,16 +223,49 @@ function VoteCountdown({ target, tick }: { target: string; tick: number }) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return (
-    <div>
-      <p className="mb-3 text-xs font-black uppercase text-ember">Liberação da votação em</p>
+    <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-center">
+      <p className="mb-2 text-xs font-black uppercase text-ember">{label}</p>
       <div className="grid grid-cols-4 gap-2">
         <CountdownBox value={days} label="Dias" />
         <CountdownBox value={hours} label="Horas" />
         <CountdownBox value={minutes} label="Min" />
         <CountdownBox value={seconds} label="Seg" />
       </div>
+      {detail && <p className="mt-2 text-[10px] font-semibold text-white/50">{detail}</p>}
     </div>
   );
+}
+
+function getPartyStart(settings: EventSettings | null) {
+  if (!settings?.eventDate || !settings.eventTime) return null;
+  const [year, month, day] = settings.eventDate.split('-').map(Number);
+  const [hour, minute] = settings.eventTime.split(':').map(Number);
+  const requestedTime = Date.UTC(year, month - 1, day, hour, minute);
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: settings.timezone || 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
+  let timestamp = requestedTime;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const parts = formatter.formatToParts(new Date(timestamp));
+    const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+    const representedTime = Date.UTC(
+      value('year'),
+      value('month') - 1,
+      value('day'),
+      value('hour'),
+      value('minute'),
+      value('second'),
+    );
+    timestamp += requestedTime - representedTime;
+  }
+  return new Date(timestamp);
 }
 
 function CountdownBox({ value, label }: { value: number; label: string }) {
