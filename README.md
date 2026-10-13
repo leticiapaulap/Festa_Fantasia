@@ -156,7 +156,6 @@ Os testes da API verificam a assinatura/flags do cookie, voto duplicado concorre
 
 Com perfil `dev`, o Flyway carrega:
 
-- Letícia — Malévola
 - João — Coringa
 - Ana — Wandinha
 - Pedro — Harry Potter
