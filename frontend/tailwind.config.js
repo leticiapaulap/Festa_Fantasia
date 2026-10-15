@@ -17,15 +17,16 @@ export default {
         78: '0.78'
       },
       colors: {
-        night: '#0b0712',
-        ink: '#15101d',
-        velvet: '#6d28d9',
-        ember: '#f97316',
-        mist: '#f6edf8'
+        night: '#0d0912',
+        ink: '#1c1324',
+        velvet: '#765d85',
+        ember: '#f47718',
+        mist: '#e9d8ba',
+        plum: '#25152f'
       },
       boxShadow: {
-        glow: '0 0 32px rgba(249, 115, 22, 0.18)',
-        violet: '0 0 36px rgba(109, 40, 217, 0.24)'
+        glow: '0 0 28px rgba(244, 119, 24, 0.16)',
+        violet: '0 0 32px rgba(118, 93, 133, 0.18)'
       }
     }
   },

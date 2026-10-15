@@ -84,6 +84,13 @@ export type Dashboard = {
   results: Results;
 };
 
+export type DeleteParticipantResponse = {
+  success: boolean;
+  deletedParticipantId: number;
+  deletedTestVotes: number;
+  photoDeleted: boolean;
+};
+
 export type LoginResponse = {
   token: string;
   name: string;

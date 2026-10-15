@@ -1,25 +1,26 @@
-import { Link, Outlet } from 'react-router-dom';
-import { Shield, VenetianMask } from 'lucide-react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { HalloweenDecor } from '../components/HalloweenDecor';
+import { PublicHeader } from '../components/halloween/PublicHeader';
+import { useEventSettings } from '../services/useEventSettings';
 
 export function PublicLayout() {
+  const { pathname } = useLocation();
+  const isHome = pathname === '/';
+  const event = useEventSettings({ refreshIntervalMs: isHome ? 30000 : 0 });
+
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
-      <HalloweenDecor />
-      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        <Link to="/" className="flex min-w-0 items-center gap-2 font-black uppercase text-white">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-ember text-night">
-            <VenetianMask className="h-5 w-5" />
-          </span>
-          <span className="truncate">Halloween</span>
-        </Link>
-        <Link to="/admin" className="rounded-lg border border-white/10 p-3 text-white/75 hover:bg-white/10" aria-label="Admin">
-          <Shield className="h-5 w-5" />
-        </Link>
-      </header>
-      <main className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6">
-        <Outlet />
+    <div className={`public-shell ${isHome ? 'is-home' : 'is-interior'}`}>
+      <a className="skip-link" href="#main-content">Pular para o conteúdo</a>
+      <HalloweenDecor home={isHome} />
+      <PublicHeader event={event} />
+      <main id="main-content" className={isHome ? 'home-main' : 'public-main'} tabIndex={-1}>
+        <Outlet context={event} />
       </main>
+      <footer className="public-footer">
+        <Link to="/" className="footer-brand">Halloween</Link>
+        <span>Uma noite. Muitas identidades.</span>
+        <Link to="/admin">Área da organização <span aria-hidden="true">↗</span></Link>
+      </footer>
     </div>
   );
 }

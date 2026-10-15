@@ -1,5 +1,5 @@
 const Busboy = require('busboy');
-const { put } = require('@vercel/blob');
+const { del, put } = require('@vercel/blob');
 const { randomUUID } = require('node:crypto');
 const { getPool } = require('./database');
 const { getSettingsEntity } = require('./settings');
@@ -106,13 +106,62 @@ async function updateParticipant(id, req) {
 }
 
 async function deleteParticipant(id) {
-  const votes = await getPool().query('SELECT COUNT(*)::int AS total FROM votes WHERE participant_id=$1', [id]);
-  if (votes.rows[0].total > 0) {
-    await getPool().query('UPDATE participants SET active=FALSE, updated_at=NOW() WHERE id=$1', [id]);
-    return {};
+  const participantId = normalizeParticipantId(id);
+  const client = await getPool().connect();
+  let deletedTestVotes = 0;
+  let photoUrlToDelete = null;
+
+  try {
+    await client.query('BEGIN');
+    const participantResult = await client.query('SELECT * FROM participants WHERE id=$1 FOR UPDATE', [participantId]);
+    const participant = participantResult.rows[0];
+    if (!participant) throw httpError(404, 'Participante não encontrado.');
+
+    const voteResult = await client.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE is_test_vote = TRUE)::int AS test_votes,
+        COUNT(*) FILTER (WHERE is_test_vote = FALSE)::int AS official_votes
+      FROM votes
+      WHERE participant_id=$1
+    `, [participantId]);
+    deletedTestVotes = Number(voteResult.rows[0]?.test_votes || 0);
+    const officialVotes = Number(voteResult.rows[0]?.official_votes || 0);
+
+    if (officialVotes > 0) {
+      throw httpError(409, 'Este participante possui votos oficiais e não pode ser excluído diretamente.');
+    }
+
+    if (participant.photo_url && isVercelBlobParticipantPhoto(participant.photo_url)) {
+      const sharedPhoto = await client.query(
+        'SELECT COUNT(*)::int AS total FROM participants WHERE id<>$1 AND photo_url=$2',
+        [participantId, participant.photo_url]
+      );
+      if (Number(sharedPhoto.rows[0]?.total || 0) === 0) {
+        photoUrlToDelete = participant.photo_url;
+      }
+    }
+
+    if (deletedTestVotes > 0) {
+      await client.query('DELETE FROM votes WHERE participant_id=$1 AND is_test_vote=TRUE', [participantId]);
+    }
+
+    await client.query('DELETE FROM participants WHERE id=$1', [participantId]);
+    await client.query('COMMIT');
+  } catch (error) {
+    await rollbackQuietly(client);
+    throw participantDeleteError(error);
+  } finally {
+    client.release();
   }
-  await getPool().query('DELETE FROM participants WHERE id=$1', [id]);
-  return {};
+
+  const photoDeleted = photoUrlToDelete ? await deleteBlobSafely(photoUrlToDelete, participantId) : false;
+
+  return {
+    success: true,
+    deletedParticipantId: participantId,
+    deletedTestVotes,
+    photoDeleted,
+  };
 }
 
 function participantResponse(row) {
@@ -229,6 +278,78 @@ function participantDatabaseError(error) {
       return httpError(503, 'Não foi possível conectar ao banco de dados. Verifique a configuração do servidor.');
     default:
       return httpError(500, 'Não foi possível concluir o cadastro.');
+  }
+}
+
+function normalizeParticipantId(id) {
+  const participantId = Number(id);
+  if (!Number.isInteger(participantId) || participantId <= 0) {
+    throw httpError(400, 'Participante inválido.');
+  }
+  return participantId;
+}
+
+async function rollbackQuietly(client) {
+  try {
+    await client.query('ROLLBACK');
+  } catch (rollbackError) {
+    console.error('[participants] delete rollback failed', JSON.stringify({
+      endpoint: '/api/admin/participants/:id',
+      method: 'DELETE',
+      errorType: rollbackError.name || 'Error',
+      errorCode: rollbackError.code,
+    }));
+  }
+}
+
+function participantDeleteError(error) {
+  if (error.status) return error;
+  if (error.code === '23503') {
+    const relatedTable = error.table || tableFromConstraint(error.constraint);
+    if (relatedTable === 'votes') {
+      return httpError(409, 'Este participante possui votos relacionados e não pode ser excluído diretamente.');
+    }
+    return httpError(
+      409,
+      relatedTable
+        ? `Existem registros relacionados em ${relatedTable} que impedem a exclusão deste participante.`
+        : 'Existem registros relacionados que impedem a exclusão deste participante.'
+    );
+  }
+  return error;
+}
+
+function tableFromConstraint(constraint) {
+  if (typeof constraint !== 'string') return null;
+  const normalized = constraint.toLowerCase();
+  if (normalized.includes('votes')) return 'votes';
+  const participantReference = normalized.match(/^(.+)_participant_id/);
+  if (participantReference?.[1]) return participantReference[1];
+  return null;
+}
+
+function isVercelBlobParticipantPhoto(photoUrl) {
+  try {
+    const url = new URL(photoUrl);
+    return url.hostname.endsWith('.blob.vercel-storage.com') && url.pathname.startsWith('/participants/');
+  } catch {
+    return false;
+  }
+}
+
+async function deleteBlobSafely(photoUrl, participantId) {
+  try {
+    await del(photoUrl);
+    return true;
+  } catch (error) {
+    console.error('[participants] blob delete failed', JSON.stringify({
+      endpoint: '/api/admin/participants/:id',
+      method: 'DELETE',
+      participantId,
+      errorType: error.name || 'Error',
+      errorCode: error.code,
+    }));
+    return false;
   }
 }
 

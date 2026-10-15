@@ -30,7 +30,7 @@ import { RankingBoard } from '../components/RankingBoard';
 import { api, apiMessage } from '../services/api';
 import { formatEventDate, registrationStatusLabel, votingStatusLabel } from '../services/eventPhase';
 import { publicRegistrationUrl, publicVotingUrl } from '../services/publicUrl';
-import type { Dashboard, EventSettings, Participant, Results } from '../types/api';
+import type { Dashboard, DeleteParticipantResponse, EventSettings, Participant, Results } from '../types/api';
 
 type Tab = 'summary' | 'participants' | 'qr' | 'results' | 'settings';
 
@@ -42,6 +42,8 @@ export function AdminDashboardPage() {
   const [settings, setSettings] = useState<EventSettings | null>(null);
   const [editing, setEditing] = useState<Participant | null>(null);
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Participant | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
@@ -79,15 +81,38 @@ export function AdminDashboardPage() {
     }
   }
 
-  async function removeParticipant(id: number) {
-    if (!window.confirm('Deseja realmente excluir este participante?')) return;
+  async function removeParticipant() {
+    if (!deleteTarget || deletingId !== null) return;
+    const participantId = deleteTarget.id;
+    setDeletingId(participantId);
     try {
-      await api.delete(`/admin/participants/${id}`);
-      toast.success('Participante excluído.');
+      const response = await api.delete<DeleteParticipantResponse>(`/admin/participants/${participantId}`);
+      applyDeletedParticipant(response.data);
+      setDeleteTarget(null);
+      toast.success('Participante excluído com sucesso.');
       await load();
     } catch (error) {
       toast.error(apiMessage(error));
+    } finally {
+      setDeletingId(null);
     }
+  }
+
+  function applyDeletedParticipant(response: DeleteParticipantResponse) {
+    const participantId = response.deletedParticipantId;
+    const deletedTestVotes = Number(response.deletedTestVotes || 0);
+    setParticipants((current) => current.filter((participant) => participant.id !== participantId));
+    setResults((current) => removeParticipantFromResults(current, participantId, deletedTestVotes));
+    setDashboard((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        participants: Math.max(0, current.participants - 1),
+        testVotes: Math.max(0, current.testVotes - deletedTestVotes),
+        totalVotes: Math.max(0, current.totalVotes - deletedTestVotes),
+        results: removeParticipantFromResults(current.results, participantId, deletedTestVotes) ?? current.results,
+      };
+    });
   }
 
   async function createParticipant(values: ParticipantFormValues) {
@@ -228,7 +253,15 @@ export function AdminDashboardPage() {
             onGoParticipants={() => setTab('participants')}
             onGoSettings={() => setTab('settings')}
           />}
-          {tab === 'participants' && <ParticipantsAdmin participants={participants} onCreate={() => setCreating(true)} onEdit={setEditing} onDelete={removeParticipant} />}
+          {tab === 'participants' && (
+            <ParticipantsAdmin
+              participants={participants}
+              deletingId={deletingId}
+              onCreate={() => setCreating(true)}
+              onEdit={setEditing}
+              onDelete={setDeleteTarget}
+            />
+          )}
           {tab === 'qr' && (
             <QrAdmin
               settings={settings}
@@ -268,6 +301,38 @@ export function AdminDashboardPage() {
         onClose={() => setEditing(null)}
         onSave={saveParticipant}
       />
+      <Modal
+        open={!!deleteTarget}
+        title="Excluir participante?"
+        onClose={() => {
+          if (deletingId === null) setDeleteTarget(null);
+        }}
+      >
+        <div className="grid gap-4">
+          <p className="text-sm text-white/75">
+            Esta ação removerá o participante e seus votos de teste associados. Essa ação não poderá ser desfeita.
+          </p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              className="btn-secondary min-h-10 px-4 py-2"
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deletingId !== null}
+            >
+              Cancelar
+            </button>
+            <button
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-300/25 bg-rose-500/15 px-4 py-2 text-sm font-bold uppercase text-rose-50 transition hover:border-rose-200/50 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              onClick={removeParticipant}
+              disabled={deletingId !== null}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletingId !== null ? 'EXCLUINDO...' : 'Excluir participante'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -292,6 +357,36 @@ function participantPayload(values: ParticipantFormValues) {
   if (values.removePhoto) payload.append('removePhoto', 'true');
   if (values.photo) payload.append('photo', values.photo);
   return payload;
+}
+
+function removeParticipantFromResults(results: Results | null, participantId: number, deletedTestVotes: number) {
+  if (!results) return results;
+  const totalVotes = results.isTestResult
+    ? Math.max(0, results.totalVotes - deletedTestVotes)
+    : results.totalVotes;
+  let position = 0;
+  let previousVotes: number | null = null;
+  const ranking = results.ranking
+    .filter((item) => item.participantId !== participantId)
+    .map((item, index) => {
+      if (item.votes !== previousVotes) position = index + 1;
+      previousVotes = item.votes;
+      return {
+        ...item,
+        percentage: totalVotes ? Number(((item.votes / totalVotes) * 100).toFixed(2)) : 0,
+        position: totalVotes ? position : null,
+      };
+    });
+  const topVotes = ranking[0]?.votes ?? 0;
+  const winners = topVotes > 0 ? ranking.filter((item) => item.votes === topVotes) : [];
+  return {
+    ...results,
+    totalVotes,
+    ranking,
+    winners,
+    tie: winners.length > 1,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function Metric({
@@ -485,14 +580,16 @@ function Ranking({ results }: { results: Results | null }) {
 
 function ParticipantsAdmin({
   participants,
+  deletingId,
   onCreate,
   onEdit,
   onDelete,
 }: {
   participants: Participant[];
+  deletingId: number | null;
   onCreate: () => void;
   onEdit: (p: Participant) => void;
-  onDelete: (id: number) => void;
+  onDelete: (participant: Participant) => void;
 }) {
   return (
     <div className="grid gap-3">
@@ -522,7 +619,14 @@ function ParticipantsAdmin({
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <button className="btn-secondary min-h-10 min-w-0 flex-1 px-3 py-2 text-xs sm:flex-none" onClick={() => onEdit(participant)}><Edit3 className="h-4 w-4" /> Editar</button>
-            <button className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[0.04] px-3 py-2 text-xs font-bold uppercase text-rose-100/80 transition hover:border-rose-300/35 hover:bg-rose-400/10 sm:flex-none" onClick={() => onDelete(participant.id)}><Trash2 className="h-4 w-4" /> Excluir</button>
+            <button
+              className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-rose-300/20 bg-rose-400/[0.04] px-3 py-2 text-xs font-bold uppercase text-rose-100/80 transition hover:border-rose-300/35 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+              onClick={() => onDelete(participant)}
+              disabled={deletingId !== null}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletingId === participant.id ? 'EXCLUINDO...' : 'Excluir'}
+            </button>
           </div>
         </div>
       ))}

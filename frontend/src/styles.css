@@ -1,3 +1,6 @@
+@import './styles/tokens.css';
+@import './styles/cinematic.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,221 +15,82 @@ html, body, #root {
 
 body {
   margin: 0;
-  overflow-x: hidden;
-  background:
-    linear-gradient(90deg, rgba(5, 3, 12, 0.48) 0%, rgba(5, 3, 12, 0.34) 43%, rgba(5, 3, 12, 0.1) 100%),
-    linear-gradient(180deg, rgba(11, 7, 18, 0.1), rgba(11, 7, 18, 0.3)),
-    radial-gradient(circle at top left, rgba(109, 40, 217, 0.16), transparent 34rem),
-    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.18), transparent 28rem),
-    url('/assets/halloween-invitation-background.png') center center / cover fixed,
-    #0b0712;
-  color: #f6edf8;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-@media (max-width: 768px) {
-  body {
-    background:
-      linear-gradient(180deg, rgba(5, 3, 12, 0.3), rgba(5, 3, 12, 0.5)),
-      radial-gradient(circle at top left, rgba(109, 40, 217, 0.12), transparent 24rem),
-      radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.14), transparent 20rem),
-      url('/assets/halloween-invitation-background.png') 66% center / cover fixed,
-      #0b0712;
-  }
+  background: #0d0912;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
 
 button, input, textarea, select {
   font: inherit;
 }
 
-.glass {
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background:
-    linear-gradient(145deg, rgba(36, 25, 50, 0.82), rgba(11, 7, 18, 0.78)),
-    rgba(21, 16, 29, 0.74);
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-}
-
-.btn {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-bold uppercase tracking-normal transition disabled:cursor-not-allowed disabled:opacity-60;
-}
-
-.btn-primary {
-  @apply btn border border-orange-200/25 bg-ember text-night shadow-glow hover:bg-orange-300;
-  background-image: linear-gradient(135deg, #ffad38, #f97316 48%, #d9480f);
-}
-
-.btn-secondary {
-  @apply btn border border-white/15 bg-white/10 text-mist hover:border-ember/40 hover:bg-white/15;
-}
-
-.input {
-  @apply min-h-12 w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-base text-mist outline-none transition placeholder:text-white/40 focus:border-ember focus:ring-2 focus:ring-ember/20;
-}
-
-.card {
-  @apply glass rounded-lg p-4;
-}
-
-.halloween-decor {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.halloween-decor .moon-haze {
-  position: absolute;
-  right: clamp(1rem, 8vw, 8rem);
-  top: clamp(3rem, 9vw, 6rem);
-  width: clamp(8rem, 16vw, 15rem);
-  height: clamp(8rem, 16vw, 15rem);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle, rgba(255, 239, 190, 0.2), rgba(255, 178, 66, 0.08) 42%, transparent 72%);
-  filter: blur(1px);
-  opacity: 0.72;
-}
-
-.halloween-decor .fog-layer {
-  position: absolute;
-  inset: auto -12% -8% -12%;
-  height: 52vh;
-  background:
-    linear-gradient(90deg, transparent, rgba(246, 237, 248, 0.08), transparent 34%),
-    linear-gradient(115deg, transparent 8%, rgba(109, 40, 217, 0.12), transparent 46%),
-    linear-gradient(65deg, transparent 20%, rgba(249, 115, 22, 0.08), transparent 58%);
-  filter: blur(26px);
-  opacity: 0.72;
-  transform: translateX(-2%);
-  animation: fog-drift 22s ease-in-out infinite alternate;
-}
-
-.halloween-decor .particle-field {
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 18% 22%, rgba(255, 186, 73, 0.22) 0 1px, transparent 2px),
-    radial-gradient(circle at 72% 34%, rgba(246, 237, 248, 0.14) 0 1px, transparent 2px),
-    radial-gradient(circle at 42% 78%, rgba(249, 115, 22, 0.16) 0 1px, transparent 2px);
-  background-size: 16rem 14rem, 20rem 18rem, 22rem 20rem;
-  opacity: 0.35;
-}
-
-.halloween-decor .bat {
-  position: absolute;
-  width: 3.4rem;
-  height: 1.45rem;
-  opacity: 0.24;
-  transform: rotate(-8deg);
-}
-
-.halloween-decor .bat::before,
-.halloween-decor .bat::after {
-  content: "";
-  position: absolute;
-  top: 0.15rem;
-  width: 1.9rem;
-  height: 1.1rem;
-  background: rgba(246, 237, 248, 0.72);
-  clip-path: polygon(0 22%, 34% 0, 52% 48%, 73% 8%, 100% 38%, 72% 100%, 36% 66%);
-}
-
-.halloween-decor .bat::before {
-  left: 0;
-}
-
-.halloween-decor .bat::after {
-  right: 0;
-  transform: scaleX(-1);
-}
-
-.halloween-decor .bat-one {
-  left: 7vw;
-  top: 18vh;
-}
-
-.halloween-decor .bat-two {
-  right: 18vw;
-  top: 28vh;
-  transform: scale(0.72) rotate(10deg);
-  opacity: 0.18;
-}
-
-.halloween-decor .pumpkin-light {
-  position: absolute;
-  right: 5vw;
-  bottom: 5vh;
-  width: 5.8rem;
-  height: 4rem;
-  border-radius: 46% 46% 40% 40%;
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.16), transparent 18% 82%, rgba(0, 0, 0, 0.16)),
-    radial-gradient(circle at 50% 58%, rgba(255, 180, 72, 0.38), rgba(249, 115, 22, 0.12) 58%, transparent 78%);
-  box-shadow: 0 0 36px rgba(249, 115, 22, 0.18);
-  opacity: 0.42;
-}
-
-.halloween-decor .pumpkin-light::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: -0.7rem;
-  width: 0.75rem;
-  height: 1rem;
-  border-radius: 0.45rem 0.45rem 0.12rem 0.12rem;
-  background: rgba(132, 90, 42, 0.55);
-  transform: translateX(-50%) rotate(8deg);
-}
-
-.halloween-decor .pumpkin-light::after {
-  content: "";
-  position: absolute;
-  inset: 0.35rem 0.8rem;
-  border-radius: inherit;
-  background: repeating-linear-gradient(90deg, transparent 0 1rem, rgba(255, 214, 120, 0.08) 1rem 1.08rem);
-}
-
-.halloween-decor .branch-shadow {
-  position: absolute;
-  left: -2rem;
-  top: 10vh;
-  width: 16rem;
-  height: 24rem;
-  opacity: 0.16;
-  background:
-    linear-gradient(118deg, transparent 0 46%, rgba(246, 237, 248, 0.28) 46.4% 47.4%, transparent 48%),
-    linear-gradient(142deg, transparent 0 50%, rgba(246, 237, 248, 0.22) 50.4% 51.4%, transparent 52%),
-    linear-gradient(82deg, transparent 0 51%, rgba(246, 237, 248, 0.18) 51.3% 52%, transparent 52.6%);
+.glass, .halloween-card {
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(135deg, rgb(37 21 47 / 94%), var(--surface));
+  box-shadow: var(--shadow-surface), inset 0 1px 0 rgb(233 216 186 / 3%);
 }
 
 .halloween-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background:
-    linear-gradient(150deg, rgba(41, 28, 54, 0.88), rgba(14, 9, 20, 0.88) 58%),
-    radial-gradient(circle at 20% 0%, rgba(249, 115, 22, 0.12), transparent 34rem);
-  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(13px);
 }
 
-.halloween-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 36%),
-    linear-gradient(180deg, transparent, rgba(249, 115, 22, 0.06));
-  opacity: 0.75;
+.btn {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded px-4 py-3 text-sm font-bold uppercase disabled:cursor-not-allowed disabled:opacity-60;
+  transition: transform 220ms var(--ease-out), background-color 220ms, border-color 220ms, box-shadow 220ms;
 }
 
-.halloween-card > * {
-  position: relative;
-  z-index: 1;
+.btn:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.btn:focus-visible {
+  outline: 2px solid #ffb477;
+  outline-offset: 4px;
+}
+
+.btn-primary {
+  @apply btn border border-orange-200/20 text-night;
+  background: linear-gradient(115deg, #f6a04e, #f47718);
+  box-shadow: 0 4px 24px rgb(244 119 24 / 12%), inset 0 1px 0 rgb(255 255 255 / 12%);
+}
+
+.btn-primary:not(:disabled):hover {
+  box-shadow: 0 6px 30px rgb(244 119 24 / 24%);
+  background-color: #ffab64;
+}
+
+.btn-secondary {
+  @apply btn;
+  border: 1px solid rgb(233 216 186 / 28%);
+  color: var(--ivory);
+  background: rgb(37 21 47 / 75%);
+}
+
+.btn-secondary:not(:disabled):hover {
+  border-color: #c18e60;
+  background-color: #302035;
+}
+
+.input {
+  @apply min-h-12 w-full rounded border border-white/20 px-4 py-3 text-base outline-none placeholder:text-white/55;
+  color: var(--text-primary);
+  background: rgb(13 9 18 / 70%);
+  transition: border-color 180ms, box-shadow 180ms;
+}
+
+.input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgb(244 119 24 / 16%);
+}
+
+.card {
+  @apply glass rounded-lg p-4;
 }
 
 .participant-photo-frame {
@@ -252,31 +116,9 @@ button, input, textarea, select {
   @apply inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-black uppercase;
 }
 
-@keyframes fog-drift {
-  from {
-    transform: translateX(-3%) translateY(0);
-  }
-
-  to {
-    transform: translateX(3%) translateY(-2%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .halloween-decor .fog-layer {
-    animation: none;
-  }
-
-  .halloween-card,
-  .participant-photo-frame img,
-  .btn {
-    transition-duration: 1ms !important;
-  }
-}
-
 .toast {
-  background: #15101d !important;
-  color: #f6edf8 !important;
+  background: #1c1324 !important;
+  color: #f3e8d4 !important;
   border: 1px solid rgba(255,255,255,0.12) !important;
 }
 
