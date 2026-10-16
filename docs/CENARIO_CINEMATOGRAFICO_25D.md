@@ -1,5 +1,7 @@
 # Cenário cinematográfico 2.5D — 16/10/2026
 
+> Registro histórico do commit `e5435e3`. A correção posterior adiciona reprojeção WebGL à própria fotografia; consulte [Correção da profundidade fotográfica](CORRECAO_PROFUNDIDADE_FOTOGRAFICA.md) para a implementação e a validação atuais.
+
 ## Diagnóstico e decisão técnica
 
 A home usa `PublicLayout` → `HalloweenDecor`, com composição em `HomePage.tsx`. Antes desta evolução, a fotografia ficava imóvel e um deslocamento CSS movia conjuntamente a atmosfera. O background correto continua sendo `frontend/public/assets/halloween-invitation-background.png`, servido pela cópia WebP existente quando o navegador suporta esse formato.

@@ -118,6 +118,27 @@
   height: 100%;
 }
 
+.scene-picture, .scene-photo-depth {
+  filter: brightness(1.13) contrast(1.02) saturate(0.85);
+}
+
+.scene-photo-depth {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+}
+
+[data-depth-state='ready'] .scene-photo-depth {
+  visibility: visible;
+}
+
+.scene-home[data-quality='full'] .scene-picture,
+.scene-home[data-quality='full'] .scene-photo-depth {
+  transform: scale(1.025);
+}
+
 .scene-photo {
   object-fit: cover;
   object-position: 36% center;

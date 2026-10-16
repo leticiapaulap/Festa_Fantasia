@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from 'react';
+import type { PhotoCamera } from './photoDepthRenderer';
 
-export function useCinematicCamera(scene: RefObject<HTMLDivElement>, active: boolean) {
+export function useCinematicCamera(scene: RefObject<HTMLDivElement>, active: boolean, camera: RefObject<PhotoCamera>) {
   useEffect(() => {
     if (!scene.current) return;
     const element = scene.current;
@@ -14,6 +15,11 @@ export function useCinematicCamera(scene: RefObject<HTMLDivElement>, active: boo
     const paint = () => {
       element.style.setProperty('--camera-x', horizontal.toFixed(5));
       element.style.setProperty('--camera-y', vertical.toFixed(5));
+      if (camera.current) {
+        camera.current.horizontal = horizontal;
+        camera.current.vertical = vertical;
+        camera.current.render?.();
+      }
     };
     const reset = () => {
       window.cancelAnimationFrame(frame);
@@ -75,5 +81,5 @@ export function useCinematicCamera(scene: RefObject<HTMLDivElement>, active: boo
       window.removeEventListener('blur', center);
       document.removeEventListener('pointerleave', center);
     };
-  }, [active, scene]);
+  }, [active, scene, camera]);
 }

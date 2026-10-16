@@ -17,6 +17,7 @@ const requireTool = createRequire(process.env.HALLOWEEN_QA_TOOLS
   ? path.join(process.env.HALLOWEEN_QA_TOOLS, 'package.json') : import.meta.url);
 const { chromium } = requireTool('playwright');
 const { AxeBuilder } = requireTool('@axe-core/playwright');
+const sharp = requireTool('sharp');
 const output = process.env.HALLOWEEN_QA_OUTPUT || path.join(tmpdir(), 'halloween-cinematic-results');
 const origin = 'http://127.0.0.1:4174';
 let browser;
@@ -462,6 +463,124 @@ test('mobile and lack of CSS 3D use a stable photograph with limited atmosphere'
       assert.equal(await page.locator('.fog-near').isVisible(), true);
       assert.equal(await page.locator('.cinematic-scene canvas').count(), 0);
       await assertLayout(page);
+      assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+  }
+});
+
+test('photographic pixels have different depth while both masks translate rigidly', async () => {
+  const { context, page, errors } = await fixture({}, { viewport: { width: 1672, height: 941 } });
+  try {
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
+      Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
+    });
+    await ready(page);
+    await page.locator('[data-depth-state="ready"]').waitFor({ state: 'attached' });
+    await page.screenshot({ path: path.join(output, 'photo-depth-integrated.png'), animations: 'disabled' });
+    await page.addStyleTag({ content: `
+      .cinematic-scene { height: 941px !important; }
+      .scene-lens { inset: 0 !important; }
+      .scene-camera-float, .scene-camera-rig, .scene-depth-plane { transform: none !important; animation: none !important; }
+      .scene-picture, .scene-photo-depth { filter: none !important; transform: none !important; }
+      .scene-atmosphere, .scene-shade, header, main, footer, .skip-link { opacity: 0 !important; }
+    ` });
+    const frames = [];
+    for (const [name, position] of [['left', 8], ['right', 1664]]) {
+      await page.mouse.move(position, 470.5);
+      await page.waitForFunction((target) => {
+        const scene = globalThis.document.querySelector('.cinematic-scene');
+        return scene?.dataset.cameraMoving === 'false' && Number(scene.style.getPropertyValue('--camera-x')) === target;
+      }, Number((position / 1672 * 2 - 1).toFixed(5)));
+      const screenshot = await page.locator('.scene-photo-depth').screenshot({ path: path.join(output, `photo-depth-${name}.png`) });
+      frames.push(await sharp(screenshot).removeAlpha().raw().toBuffer({ resolveWithObject: true }));
+    }
+    assert.equal(frames[0].info.width, 1672);
+    assert.equal(frames[0].info.height, 941);
+    function displacement(horizontal, vertical, width = 32, height = 32) {
+      let best = { shift: 0, error: Infinity };
+      for (let shift = -40; shift <= 40; shift += 1) {
+        let error = 0;
+        for (let row = 0; row < height; row += 2) {
+          for (let column = 0; column < width; column += 2) {
+            const first = ((vertical + row) * 1672 + horizontal + column) * 3;
+            const second = ((vertical + row) * 1672 + horizontal + column + shift) * 3;
+            for (let channel = 0; channel < 3; channel += 1) error += Math.abs(frames[0].data[first + channel] - frames[1].data[second + channel]);
+          }
+        }
+        if (error < best.error) best = { shift, error };
+      }
+      return { shift: best.shift, meanError: best.error / (Math.ceil(width / 2) * Math.ceil(height / 2) * 3) };
+    }
+    const depths = {
+      sky: displacement(1000, 100), trees: displacement(900, 450), ground: displacement(1100, 850),
+      firstMask: displacement(340, 403, 30, 45), secondMask: displacement(535, 419, 30, 32),
+      firstCostume: displacement(315, 540), secondCostume: displacement(520, 675),
+    };
+    assert.ok(Math.abs(depths.sky.shift - depths.firstMask.shift) > 12, JSON.stringify(depths));
+    assert.ok(Math.abs(depths.ground.shift - depths.trees.shift) > 12, JSON.stringify(depths));
+    for (const region of ['firstMask', 'secondMask', 'firstCostume', 'secondCostume']) {
+      assert.ok(Math.abs(depths[region].shift - depths.firstMask.shift) <= 1, JSON.stringify(depths));
+      assert.ok(depths[region].meanError < 8, JSON.stringify(depths));
+    }
+    console.log(`Measured photographic pixel displacement (left/right camera): ${JSON.stringify(depths)}`);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('WebGL failure and context loss reveal the original photo without blocking navigation', async () => {
+  for (const unavailable of [true, false]) {
+    const { context, page, errors } = await fixture();
+    try {
+      await page.addInitScript((disableWebGL) => {
+        Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
+        Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
+        globalThis.depthDraws = 0;
+        globalThis.depthAttempts = 0;
+        const getContext = globalThis.HTMLCanvasElement.prototype.getContext;
+        globalThis.HTMLCanvasElement.prototype.getContext = function (kind, options) {
+          if (kind === 'webgl') {
+            globalThis.depthAttempts += 1;
+            if (disableWebGL) return null;
+          }
+          return getContext.call(this, kind, options);
+        };
+        const drawArrays = globalThis.WebGLRenderingContext.prototype.drawArrays;
+        globalThis.WebGLRenderingContext.prototype.drawArrays = function (...argumentsList) {
+          if (this.canvas.classList.contains('scene-photo-depth')) globalThis.depthDraws += 1;
+          return drawArrays.apply(this, argumentsList);
+        };
+      }, unavailable);
+      await ready(page);
+      await page.waitForFunction(() => globalThis.depthAttempts > 0);
+      if (!unavailable) {
+        await page.locator('[data-depth-state="ready"]').waitFor({ state: 'attached' });
+        await page.mouse.move(1300, 500);
+        await page.waitForFunction(() => globalThis.document.querySelector('.cinematic-scene')?.dataset.cameraMoving === 'false');
+        const draws = await page.evaluate(() => globalThis.depthDraws);
+        await page.evaluate(() => new Promise((resolve) => {
+          let frames = 0;
+          const next = () => { if (++frames === 20) resolve(); else globalThis.requestAnimationFrame(next); };
+          globalThis.requestAnimationFrame(next);
+        }));
+        assert.equal(await page.evaluate(() => globalThis.depthDraws), draws);
+        await page.locator('.scene-photo-depth').evaluate((canvas) => {
+          globalThis.depthContextControl = canvas.getContext('webgl').getExtension('WEBGL_lose_context');
+          globalThis.depthContextControl.loseContext();
+        });
+      }
+      await page.locator('[data-depth-state="fallback"]').waitFor({ state: 'attached' });
+      assert.equal(await page.locator('.scene-photo-depth').isVisible(), false);
+      assert.equal(await page.locator('.scene-photo').isVisible(), true);
+      if (!unavailable) {
+        await page.evaluate(() => globalThis.depthContextControl.restoreContext());
+        await page.locator('[data-depth-state="ready"]').waitFor({ state: 'attached' });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.waitForFunction(() => !globalThis.document.querySelector('.scene-photo-depth'));
+      }
+      await page.getByRole('link', { name: 'Cadastrar minha fantasia' }).click();
+      await page.waitForURL(`${origin}/cadastro`);
+      assert.equal(await page.locator('.scene-photo-depth').count(), 0);
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
   }
