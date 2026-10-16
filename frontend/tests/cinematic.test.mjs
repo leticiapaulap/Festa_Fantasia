@@ -348,3 +348,121 @@ test('local initial rendering records LCP and avoids significant layout shift', 
     console.log(`Local synthetic metrics (unthrottled, mocked API): ${JSON.stringify(metrics)}`);
   } finally { await context.close(); }
 });
+
+test('desktop camera interpolates across real depth planes while the interface stays fixed', async () => {
+  const { context, page, errors } = await fixture();
+  try {
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
+      Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
+    });
+    await ready(page);
+    await page.locator('.cinematic-scene[data-quality="full"]').waitFor({ state: 'attached' });
+    await page.locator('.hero-actions').evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const interfaceBefore = await page.locator('.hero-actions').boundingBox();
+    await page.mouse.move(1390, 710);
+    await page.waitForFunction(() => globalThis.document.querySelector('.cinematic-scene')?.dataset.cameraMoving === 'true');
+    const earlyPosition = await page.locator('.cinematic-scene').evaluate((element) => Number(element.style.getPropertyValue('--camera-x')));
+    await page.waitForFunction(() => {
+      const scene = globalThis.document.querySelector('.cinematic-scene');
+      return scene?.dataset.cameraMoving === 'false' && Number(scene.style.getPropertyValue('--camera-x')) > 0.9;
+    });
+    const spatial = await page.evaluate(() => {
+      const scene = globalThis.document.querySelector('.cinematic-scene');
+      const matrix = (selector) => new globalThis.DOMMatrixReadOnly(globalThis.getComputedStyle(scene.querySelector(selector)).transform);
+      return {
+        horizontal: Number(scene.style.getPropertyValue('--camera-x')),
+        photographDepth: matrix('.scene-depth-photo').m43,
+        hazeDepth: matrix('.scene-depth-haze').m43,
+        foregroundDepth: matrix('.scene-depth-foreground').m43,
+        photographTravel: matrix('.scene-depth-photo').m41,
+        foregroundTravel: matrix('.scene-depth-foreground').m41,
+        perspective: globalThis.getComputedStyle(scene.querySelector('.scene-lens')).perspective,
+        pointerEvents: globalThis.getComputedStyle(scene).pointerEvents,
+      };
+    });
+    assert.ok(earlyPosition < spatial.horizontal);
+    assert.ok(spatial.horizontal <= 1);
+    assert.ok(spatial.photographDepth < spatial.hazeDepth && spatial.hazeDepth < spatial.foregroundDepth);
+    assert.ok(Math.abs(spatial.foregroundTravel) > Math.abs(spatial.photographTravel) * 3);
+    assert.equal(spatial.perspective, '1200px');
+    assert.equal(spatial.pointerEvents, 'none');
+    assert.equal(await page.locator('.cinematic-scene img').count(), 1);
+    assert.equal(await page.locator('.scene-ember').count(), 10);
+    assert.equal(await page.locator('.scene-fog').count(), 3);
+    assert.deepEqual(await page.locator('.hero-actions').boundingBox(), interfaceBefore);
+    const changesWhileIdle = await page.locator('.cinematic-scene').evaluate((element) => new Promise((resolve) => {
+      let mutations = 0;
+      let frames = 0;
+      const observer = new globalThis.MutationObserver((entries) => { mutations += entries.length; });
+      observer.observe(element, { attributes: true, attributeFilter: ['style'] });
+      const observeFrame = () => {
+        frames += 1;
+        if (frames < 12) return globalThis.requestAnimationFrame(observeFrame);
+        observer.disconnect();
+        resolve(mutations);
+      };
+      globalThis.requestAnimationFrame(observeFrame);
+    }));
+    assert.equal(changesWhileIdle, 0);
+    await page.screenshot({ path: path.join(output, 'scene-depth-desktop.png'), fullPage: true, animations: 'disabled' });
+    await page.getByRole('link', { name: 'Cadastrar minha fantasia' }).click();
+    await page.waitForURL(`${origin}/cadastro`);
+    await page.locator('.scene-interior[data-quality="static"]').waitFor({ state: 'attached' });
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('camera stops offscreen and respects reduced motion changes immediately', async () => {
+  const { context, page } = await fixture();
+  try {
+    await page.addInitScript(() => Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 }));
+    await ready(page);
+    await page.locator('.cinematic-scene[data-quality="full"]').waitFor({ state: 'attached' });
+    await page.mouse.move(1200, 600);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('.cinematic-scene[data-quality="static"]').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('.scene-camera-rig').evaluate((element) => globalThis.getComputedStyle(element).transform), 'none');
+    assert.equal(await page.locator('.scene-camera-float').evaluate((element) => globalThis.getComputedStyle(element).animationName), 'none');
+    assert.equal(await page.locator('.cinematic-scene').getAttribute('data-camera-moving'), 'false');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.locator('.cinematic-scene[data-quality="full"]').waitFor({ state: 'attached' });
+    await page.evaluate(() => {
+      globalThis.document.querySelector('.public-shell').style.minHeight = '2600px';
+      globalThis.scrollTo(0, 1600);
+    });
+    await page.locator('.cinematic-scene[data-paused="true"]').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('.fog-near').evaluate((element) => globalThis.getComputedStyle(element).animationPlayState), 'paused');
+    assert.equal(await page.locator('.cinematic-scene').getAttribute('data-camera-moving'), 'false');
+    await page.evaluate(() => globalThis.scrollTo(0, 0));
+    await page.locator('.cinematic-scene[data-paused="false"]').waitFor({ state: 'attached' });
+  } finally { await context.close(); }
+});
+
+test('mobile and lack of CSS 3D use a stable photograph with limited atmosphere', async () => {
+  for (const variant of ['mobile', 'no-3d']) {
+    const { context, page, errors } = await fixture({}, { viewport: { width: variant === 'mobile' ? 390 : 1440, height: 844 } });
+    try {
+      await page.addInitScript((disableDepth) => {
+        Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
+        Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
+        if (disableDepth) {
+          const originalSupports = globalThis.CSS.supports.bind(globalThis.CSS);
+          globalThis.CSS.supports = (...argumentsList) => argumentsList[0] === 'transform-style' ? false : originalSupports(...argumentsList);
+        }
+      }, variant === 'no-3d');
+      await ready(page);
+      await page.locator('.cinematic-scene[data-quality="ambient"]').waitFor({ state: 'attached' });
+      assert.equal(await page.locator('.scene-camera-rig').evaluate((element) => globalThis.getComputedStyle(element).transform), 'none');
+      assert.equal(await page.locator('.scene-motes-near').isVisible(), false);
+      assert.equal(await page.locator('.scene-motes-far').isVisible(), false);
+      assert.equal(await page.locator('.fog-far').isVisible(), false);
+      assert.equal(await page.locator('.fog-near').isVisible(), true);
+      assert.equal(await page.locator('.cinematic-scene canvas').count(), 0);
+      await assertLayout(page);
+      assert.deepEqual(errors, []);
+    } finally { await context.close(); }
+  }
+});
