@@ -1,0 +1,58 @@
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/assets/fonts/cinzel-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('/assets/fonts/manrope-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --obsidian: #0d0912;
+  --plum: #25152f;
+  --amber: #f47718;
+  --ivory: #e9d8ba;
+  --violet: #765d85;
+  --text-primary: #f3e8d4;
+  --text-secondary: #c6bac9;
+  --text-muted: #aca0b1;
+  --border-soft: rgb(233 216 186 / 15%);
+  --border-lit: rgb(244 119 24 / 38%);
+  --surface: rgb(20 14 27 / 94%);
+  --font-display: 'Cinzel', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Manrope', 'Segoe UI', sans-serif;
+  --page-width: 1440px;
+  --page-gutter: clamp(1.25rem, 4.5vw, 5rem);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.25, 1);
+  --shadow-surface: 0 20px 60px rgb(0 0 0 / 22%);
+}
+
+::selection {
+  color: var(--obsidian);
+  background: var(--ivory);
+}
+
+:focus-visible {
+  outline: 2px solid #ffb477;
+  outline-offset: 5px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
