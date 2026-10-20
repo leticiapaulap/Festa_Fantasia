@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test:deploy": "node --test tests/deploy-files.test.mjs",
+    "test:scene": "node --test tests/scene-animation.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

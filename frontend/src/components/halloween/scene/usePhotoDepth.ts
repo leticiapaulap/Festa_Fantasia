@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { PhotoCamera, PhotoDepthRenderer } from './photoDepthRenderer';
+import { createSceneAnimation } from './sceneAnimation';
 
 export function usePhotoDepth(canvas: RefObject<HTMLCanvasElement>, photograph: RefObject<HTMLImageElement>, camera: RefObject<PhotoCamera>, enabled: boolean, paused: boolean) {
   const [ready, setReady] = useState(false);
   const pause = useRef(paused);
+  const playback = useRef<{ resume: () => void; pause: () => void } | null>(null);
   pause.current = paused;
 
   useEffect(() => {
@@ -17,33 +19,51 @@ export function usePhotoDepth(canvas: RefObject<HTMLCanvasElement>, photograph: 
     let renderer: PhotoDepthRenderer | null = null;
     let frame = 0;
     let timer = 0;
+    let version = 0;
+    let painted = false;
 
-    const draw = () => {
-      if (!pause.current) renderer?.draw(motion);
+    const animation = createSceneAnimation((seconds) => {
+      if (cancelled || pause.current || document.hidden) {
+        animation.pause();
+        return;
+      }
+      if (renderer?.draw(motion, seconds) && !painted) {
+        painted = true;
+        setReady(true);
+      }
+    });
+    const resume = () => {
+      if (renderer && !pause.current && !document.hidden && !cancelled) animation.resume();
     };
+    playback.current = { resume, pause: animation.pause };
     const scheduleResize = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
         renderer?.resize();
-        draw();
+        if (!pause.current) renderer?.draw(motion, animation.time);
       });
     };
     const initialize = async () => {
+      const initialization = ++version;
       try {
         const module = await import('./photoDepthRenderer');
         await image.decode();
-        if (cancelled) return;
+        if (cancelled || initialization !== version) return;
         depth.src = '/assets/halloween-invitation-depth.svg';
         await depth.decode();
-        if (cancelled) return;
+        if (cancelled || initialization !== version) return;
+        renderer?.dispose();
         renderer = module.createPhotoDepthRenderer(surface, image, depth);
         if (!renderer) return;
-        motion.render = draw;
-        draw();
-        setReady(true);
+        motion.render = resume;
+        resume();
       } catch {
+        if (cancelled || initialization !== version) return;
+        animation.pause();
         renderer?.dispose();
         renderer = null;
+        painted = false;
+        setReady(false);
       }
     };
     const start = () => {
@@ -52,6 +72,9 @@ export function usePhotoDepth(canvas: RefObject<HTMLCanvasElement>, photograph: 
     };
     const contextLost = (event: Event) => {
       event.preventDefault();
+      version += 1;
+      painted = false;
+      animation.pause();
       setReady(false);
       renderer?.dispose();
       renderer = null;
@@ -65,20 +88,24 @@ export function usePhotoDepth(canvas: RefObject<HTMLCanvasElement>, photograph: 
     start();
     return () => {
       cancelled = true;
+      version += 1;
+      animation.pause();
+      playback.current = null;
       window.clearTimeout(timer);
       window.cancelAnimationFrame(frame);
       observer?.disconnect();
       window.removeEventListener('resize', scheduleResize);
       surface.removeEventListener('webglcontextlost', contextLost);
       surface.removeEventListener('webglcontextrestored', start);
-      if (motion.render === draw) motion.render = undefined;
+      if (motion.render === resume) motion.render = undefined;
       renderer?.dispose();
     };
   }, [canvas, photograph, camera, enabled]);
 
   useEffect(() => {
-    if (!paused) camera.current?.render?.();
-  }, [paused, camera]);
+    if (paused) playback.current?.pause();
+    else playback.current?.resume();
+  }, [paused]);
 
   return enabled && ready;
 }

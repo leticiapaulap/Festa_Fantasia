@@ -1,7 +1,7 @@
 export type PhotoCamera = { horizontal: number; vertical: number; render?: () => void };
 
 export type PhotoDepthRenderer = {
-  draw: (camera: PhotoCamera) => void;
+  draw: (camera: PhotoCamera, seconds: number) => boolean;
   resize: () => void;
   dispose: () => void;
 };
@@ -22,18 +22,47 @@ const fragmentSource = `
   uniform vec2 camera;
   uniform vec2 cropScale;
   uniform vec2 cropOffset;
+  uniform float sceneTime;
   varying vec2 imagePosition;
+
+  float fogNoise(vec2 position) {
+    vec2 cell = floor(position);
+    vec2 weight = fract(position);
+    weight = weight * weight * (3.0 - 2.0 * weight);
+    vec4 corners = vec4(
+      dot(cell, vec2(127.1, 311.7)),
+      dot(cell + vec2(1.0, 0.0), vec2(127.1, 311.7)),
+      dot(cell + vec2(0.0, 1.0), vec2(127.1, 311.7)),
+      dot(cell + vec2(1.0), vec2(127.1, 311.7))
+    );
+    vec4 noise = fract(sin(corners) * 43758.5453);
+    return mix(mix(noise.x, noise.y, weight.x), mix(noise.z, noise.w, weight.x), weight.y);
+  }
 
   void main() {
     vec2 origin = imagePosition * cropScale + cropOffset;
     vec2 source = origin;
-    vec2 movement = camera * vec2(0.018, 0.010);
+    vec2 drift = vec2(sin(sceneTime * 0.16) * 0.12, (cos(sceneTime * 0.12) - 1.0) * 0.05);
+    vec2 movement = (camera + drift) * vec2(0.018, 0.010);
     for (int step = 0; step < 4; step++) {
       float depth = texture2D(depthMap, source).r;
       source = origin + movement * (depth - 0.45);
     }
     source = clamp(source, vec2(0.001), vec2(0.999));
     vec3 color = texture2D(photograph, source).rgb;
+    vec2 scene = texture2D(depthMap, source).rg;
+    float distance = clamp((0.85 - scene.r) * 1.7, 0.0, 1.0);
+    float protection = 1.0 - scene.g * 0.98;
+    float ground = smoothstep(0.50, 0.83, source.y);
+    float framing = 1.0 - smoothstep(0.48, 0.88, source.x);
+    vec2 cloud = source * vec2(5.5, 4.0) + vec2(sceneTime * -0.012, sceneTime * 0.003);
+    float density = fogNoise(cloud) * 0.68 + fogNoise(cloud * 2.3 + vec2(7.0, -3.0)) * 0.32;
+    float mist = smoothstep(0.28, 0.76, density) * ground * (0.035 + distance * 0.085) * protection * framing;
+    color = mix(color, vec3(0.49, 0.43, 0.54), mist);
+    float glow = exp(-dot((source - vec2(0.32, 0.34)) * vec2(1.1, 1.0), (source - vec2(0.32, 0.34)) * vec2(1.1, 1.0)) * 7.0);
+    float pulse = 0.5 + 0.5 * sin(sceneTime * 0.23);
+    color += vec3(1.0, 0.46, 0.12) * glow * (0.008 + pulse * 0.012) * protection;
+    color += vec3(0.34, 0.22, 0.52) * distance * (0.010 + (1.0 - pulse) * 0.012) * protection;
     gl_FragColor = vec4(color, 1.0);
   }
 `;
@@ -99,6 +128,7 @@ export function createPhotoDepthRenderer(canvas: HTMLCanvasElement, image: HTMLI
     const cameraLocation = graphics.getUniformLocation(program, 'camera');
     const scaleLocation = graphics.getUniformLocation(program, 'cropScale');
     const offsetLocation = graphics.getUniformLocation(program, 'cropOffset');
+    const timeLocation = graphics.getUniformLocation(program, 'sceneTime');
     const resize = () => {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
@@ -113,12 +143,14 @@ export function createPhotoDepthRenderer(canvas: HTMLCanvasElement, image: HTMLI
     resize();
     return {
       resize,
-      draw: (camera) => {
-        if (disposed || graphics.isContextLost()) return;
+      draw: (camera, seconds) => {
+        if (disposed || graphics.isContextLost()) return false;
         graphics.uniform2f(cameraLocation, camera.horizontal, camera.vertical);
         graphics.uniform2f(scaleLocation, cropScale[0], cropScale[1]);
         graphics.uniform2f(offsetLocation, cropOffset[0], cropOffset[1]);
+        graphics.uniform1f(timeLocation, seconds);
         graphics.drawArrays(graphics.TRIANGLES, 0, 6);
+        return true;
       },
       dispose,
     };

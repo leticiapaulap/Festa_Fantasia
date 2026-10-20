@@ -1,5 +1,7 @@
 # Correção da profundidade fotográfica — 16/10/2026
 
+> Registro histórico do commit `6b3fa2d`. O movimento ambiental contínuo e a atmosfera orientada por profundidade foram acrescentados em [Cenário vivo — 20/10/2026](CENARIO_VIVO_2026_10_20.md).
+
 ## O que estava faltando
 
 A implementação anterior mantinha a fotografia inteira em um plano CSS. A câmera e a atmosfera tinham profundidade, mas céu, árvores, personagens e chão da fotografia não respondiam de forma diferente. Essa limitação não atendia ao efeito solicitado.

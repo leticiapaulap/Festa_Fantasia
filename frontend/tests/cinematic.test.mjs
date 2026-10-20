@@ -80,6 +80,61 @@ async function ready(page) {
   await page.evaluate(() => globalThis.document.fonts.ready);
 }
 
+async function observeScene(page, frozenTime = null) {
+  await page.addInitScript((frozenTime) => {
+    globalThis.sceneProbe = { draws: 0, time: 0, appliedTime: 0, frozenTime };
+    const locations = new globalThis.WeakSet();
+    const prototype = globalThis.WebGLRenderingContext.prototype;
+    const getLocation = prototype.getUniformLocation;
+    prototype.getUniformLocation = function (program, name) {
+      const location = getLocation.call(this, program, name);
+      if (name === 'sceneTime' && location) locations.add(location);
+      return location;
+    };
+    const uniform = prototype.uniform1f;
+    prototype.uniform1f = function (location, value) {
+      if (locations.has(location)) {
+        globalThis.sceneProbe.time = value;
+        value = globalThis.sceneProbe.frozenTime ?? value;
+        globalThis.sceneProbe.appliedTime = value;
+      }
+      return uniform.call(this, location, value);
+    };
+    const draw = prototype.drawArrays;
+    prototype.drawArrays = function (...argumentsList) {
+      if (this.canvas.classList.contains('scene-photo-depth')) globalThis.sceneProbe.draws += 1;
+      return draw.apply(this, argumentsList);
+    };
+  }, frozenTime);
+}
+
+async function isolatePhotograph(page) {
+  await page.addStyleTag({ content: `
+    .cinematic-scene { height: 941px !important; }
+    .scene-lens { inset: 0 !important; }
+    .scene-camera-float, .scene-camera-rig, .scene-depth-plane { transform: none !important; animation: none !important; }
+    .scene-picture, .scene-photo-depth { filter: none !important; transform: none !important; }
+    .scene-atmosphere, .scene-shade, header, main, footer, .skip-link { opacity: 0 !important; }
+  ` });
+}
+
+function photographicDisplacement(frames, horizontal, vertical, width = 32, height = 32, range = 40) {
+  let best = { shift: 0, error: Infinity };
+  const imageWidth = frames[0].info.width;
+  for (let shift = -range; shift <= range; shift += 1) {
+    let error = 0;
+    for (let row = 0; row < height; row += 2) {
+      for (let column = 0; column < width; column += 2) {
+        const first = ((vertical + row) * imageWidth + horizontal + column) * 3;
+        const second = ((vertical + row) * imageWidth + horizontal + column + shift) * 3;
+        for (let channel = 0; channel < 3; channel += 1) error += Math.abs(frames[0].data[first + channel] - frames[1].data[second + channel]);
+      }
+    }
+    if (error < best.error) best = { shift, error };
+  }
+  return { shift: best.shift, meanError: best.error / (Math.ceil(width / 2) * Math.ceil(height / 2) * 3) };
+}
+
 async function assertLayout(page) {
   const bounds = await page.evaluate(() => {
     const range = globalThis.document.createRange();
@@ -419,6 +474,7 @@ test('desktop camera interpolates across real depth planes while the interface s
 test('camera stops offscreen and respects reduced motion changes immediately', async () => {
   const { context, page } = await fixture();
   try {
+    await observeScene(page);
     await page.addInitScript(() => Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 }));
     await ready(page);
     await page.locator('.cinematic-scene[data-quality="full"]').waitFor({ state: 'attached' });
@@ -437,8 +493,17 @@ test('camera stops offscreen and respects reduced motion changes immediately', a
     await page.locator('.cinematic-scene[data-paused="true"]').waitFor({ state: 'attached' });
     assert.equal(await page.locator('.fog-near').evaluate((element) => globalThis.getComputedStyle(element).animationPlayState), 'paused');
     assert.equal(await page.locator('.cinematic-scene').getAttribute('data-camera-moving'), 'false');
+    const suspended = await page.evaluate(() => ({ ...globalThis.sceneProbe }));
+    await page.evaluate(() => new Promise((resolve) => {
+      let frames = 0;
+      const next = () => { if (++frames === 12) resolve(); else globalThis.requestAnimationFrame(next); };
+      globalThis.requestAnimationFrame(next);
+    }));
+    assert.equal(await page.evaluate(() => globalThis.sceneProbe.draws), suspended.draws);
+    assert.equal(await page.evaluate(() => globalThis.sceneProbe.time), suspended.time);
     await page.evaluate(() => globalThis.scrollTo(0, 0));
     await page.locator('.cinematic-scene[data-paused="false"]').waitFor({ state: 'attached' });
+    await page.waitForFunction((draws) => globalThis.sceneProbe.draws > draws, suspended.draws);
   } finally { await context.close(); }
 });
 
@@ -471,6 +536,7 @@ test('mobile and lack of CSS 3D use a stable photograph with limited atmosphere'
 test('photographic pixels have different depth while both masks translate rigidly', async () => {
   const { context, page, errors } = await fixture({}, { viewport: { width: 1672, height: 941 } });
   try {
+    await observeScene(page, 0);
     await page.addInitScript(() => {
       Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
       Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
@@ -478,13 +544,7 @@ test('photographic pixels have different depth while both masks translate rigidl
     await ready(page);
     await page.locator('[data-depth-state="ready"]').waitFor({ state: 'attached' });
     await page.screenshot({ path: path.join(output, 'photo-depth-integrated.png'), animations: 'disabled' });
-    await page.addStyleTag({ content: `
-      .cinematic-scene { height: 941px !important; }
-      .scene-lens { inset: 0 !important; }
-      .scene-camera-float, .scene-camera-rig, .scene-depth-plane { transform: none !important; animation: none !important; }
-      .scene-picture, .scene-photo-depth { filter: none !important; transform: none !important; }
-      .scene-atmosphere, .scene-shade, header, main, footer, .skip-link { opacity: 0 !important; }
-    ` });
+    await isolatePhotograph(page);
     const frames = [];
     for (const [name, position] of [['left', 8], ['right', 1664]]) {
       await page.mouse.move(position, 470.5);
@@ -497,21 +557,7 @@ test('photographic pixels have different depth while both masks translate rigidl
     }
     assert.equal(frames[0].info.width, 1672);
     assert.equal(frames[0].info.height, 941);
-    function displacement(horizontal, vertical, width = 32, height = 32) {
-      let best = { shift: 0, error: Infinity };
-      for (let shift = -40; shift <= 40; shift += 1) {
-        let error = 0;
-        for (let row = 0; row < height; row += 2) {
-          for (let column = 0; column < width; column += 2) {
-            const first = ((vertical + row) * 1672 + horizontal + column) * 3;
-            const second = ((vertical + row) * 1672 + horizontal + column + shift) * 3;
-            for (let channel = 0; channel < 3; channel += 1) error += Math.abs(frames[0].data[first + channel] - frames[1].data[second + channel]);
-          }
-        }
-        if (error < best.error) best = { shift, error };
-      }
-      return { shift: best.shift, meanError: best.error / (Math.ceil(width / 2) * Math.ceil(height / 2) * 3) };
-    }
+    const displacement = (...argumentsList) => photographicDisplacement(frames, ...argumentsList);
     const depths = {
       sky: displacement(1000, 100), trees: displacement(900, 450), ground: displacement(1100, 850),
       firstMask: displacement(340, 403, 30, 45), secondMask: displacement(535, 419, 30, 32),
@@ -563,7 +609,24 @@ test('WebGL failure and context loss reveal the original photo without blocking 
           const next = () => { if (++frames === 20) resolve(); else globalThis.requestAnimationFrame(next); };
           globalThis.requestAnimationFrame(next);
         }));
-        assert.equal(await page.evaluate(() => globalThis.depthDraws), draws);
+        assert.ok(await page.evaluate(() => globalThis.depthDraws) > draws);
+        await page.evaluate(() => {
+          Object.defineProperty(globalThis.document, 'hidden', { configurable: true, value: true });
+          globalThis.document.dispatchEvent(new globalThis.Event('visibilitychange'));
+        });
+        await page.locator('.cinematic-scene[data-paused="true"]').waitFor({ state: 'attached' });
+        const pausedDraws = await page.evaluate(() => globalThis.depthDraws);
+        await page.evaluate(() => new Promise((resolve) => {
+          let frames = 0;
+          const next = () => { if (++frames === 12) resolve(); else globalThis.requestAnimationFrame(next); };
+          globalThis.requestAnimationFrame(next);
+        }));
+        assert.equal(await page.evaluate(() => globalThis.depthDraws), pausedDraws);
+        await page.evaluate(() => {
+          Object.defineProperty(globalThis.document, 'hidden', { configurable: true, value: false });
+          globalThis.document.dispatchEvent(new globalThis.Event('visibilitychange'));
+        });
+        await page.waitForFunction((count) => globalThis.depthDraws > count, pausedDraws);
         await page.locator('.scene-photo-depth').evaluate((canvas) => {
           globalThis.depthContextControl = canvas.getContext('webgl').getExtension('WEBGL_lose_context');
           globalThis.depthContextControl.loseContext();
@@ -584,4 +647,71 @@ test('WebGL failure and context loss reveal the original photo without blocking 
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
   }
+});
+
+test('ambient depth animates photographic pixels without a mouse and protects both masks', async () => {
+  const { context, page, errors } = await fixture({}, { viewport: { width: 1672, height: 941 } });
+  try {
+    await observeScene(page, 0);
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
+      Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
+    });
+    await ready(page);
+    await page.locator('[data-depth-state="ready"]').waitFor({ state: 'attached' });
+    const before = await page.evaluate(() => ({ ...globalThis.sceneProbe }));
+    await page.waitForFunction((time) => globalThis.sceneProbe.time > time + 0.5, before.time);
+    const after = await page.evaluate(() => ({ ...globalThis.sceneProbe }));
+    assert.ok(after.draws > before.draws);
+    assert.ok(after.draws - before.draws <= Math.ceil((after.time - before.time) * 24) + 3, JSON.stringify({ before, after }));
+    assert.equal(await page.locator('.cinematic-scene').getAttribute('data-camera-moving'), 'false');
+    await page.screenshot({ path: path.join(output, 'scene-alive-desktop.png'), animations: 'disabled' });
+    await isolatePhotograph(page);
+    const frames = [];
+    for (const seconds of [0, 8]) {
+      await page.evaluate((seconds) => { globalThis.sceneProbe.frozenTime = seconds; }, seconds);
+      await page.waitForFunction((seconds) => globalThis.sceneProbe.appliedTime === seconds, seconds);
+      const screenshot = await page.locator('.scene-photo-depth').screenshot({ path: path.join(output, `photo-ambient-${seconds}.png`) });
+      frames.push(await sharp(screenshot).removeAlpha().raw().toBuffer({ resolveWithObject: true }));
+    }
+    assert.notDeepEqual(frames[0].data, frames[1].data);
+    const masks = [photographicDisplacement(frames, 340, 403, 30, 45, 3), photographicDisplacement(frames, 535, 419, 30, 32, 3)];
+    for (const mask of masks) {
+      assert.ok(Math.abs(mask.shift) <= 2, JSON.stringify(masks));
+      assert.ok(mask.meanError < 4, JSON.stringify(masks));
+    }
+    assert.ok(Math.abs(masks[0].shift - masks[1].shift) <= 1, JSON.stringify(masks));
+    console.log(`Ambient camera, 0 to 8 seconds; protected mask patches: ${JSON.stringify(masks)}`);
+    await page.getByRole('link', { name: 'Ver participantes', exact: true }).click();
+    await page.waitForURL(`${origin}/participantes`);
+    assert.equal(await page.locator('.scene-photo-depth').count(), 0);
+    const stoppedDraws = await page.evaluate(() => globalThis.sceneProbe.draws);
+    await page.evaluate(() => new Promise((resolve) => {
+      let frames = 0;
+      const next = () => { if (++frames === 12) resolve(); else globalThis.requestAnimationFrame(next); };
+      globalThis.requestAnimationFrame(next);
+    }));
+    assert.equal(await page.evaluate(() => globalThis.sceneProbe.draws), stoppedDraws);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('a malformed depth asset falls back without starting a render loop or breaking navigation', async () => {
+  const { context, page, errors } = await fixture();
+  try {
+    await observeScene(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.navigator, 'hardwareConcurrency', { value: 8 });
+      Object.defineProperty(globalThis.navigator, 'deviceMemory', { value: 8 });
+    });
+    await page.route('**/halloween-invitation-depth.svg', (route) => route.fulfill({ contentType: 'image/svg+xml', body: 'invalid image' }));
+    const response = page.waitForResponse('**/halloween-invitation-depth.svg');
+    await ready(page);
+    await (await response).finished();
+    await page.getByRole('link', { name: 'Ver participantes', exact: true }).click();
+    await page.waitForURL(`${origin}/participantes`);
+    assert.equal(await page.evaluate(() => globalThis.sceneProbe.draws), 0);
+    assert.equal(await page.locator('.scene-photo').isVisible(), true);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
 });
